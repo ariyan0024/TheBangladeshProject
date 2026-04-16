@@ -166,11 +166,18 @@
         postsCache[doc.id] = doc.data();
         const card = buildCard(doc.id, doc.data());
         card.addEventListener("click", () => {
-          incrementViews(doc.id).catch(() => {}); // fire & forget
+          // Only count once per device per post
+          const viewed = JSON.parse(localStorage.getItem("viewed_posts") || "[]");
+          if (!viewed.includes(doc.id)) {
+            incrementViews(doc.id).catch(() => {});
+            viewed.push(doc.id);
+            localStorage.setItem("viewed_posts", JSON.stringify(viewed));
+          }
           openModal(doc.id, doc.data());
         });
         feedList.appendChild(card);
       });
+
     });
 
     // ── Image Zoom ──────────────────────────────────────────────
