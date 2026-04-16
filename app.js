@@ -62,6 +62,13 @@ async function reportPost(id) {
   });
 }
 
+/** Increment view counter (public — allowed by Firestore rules) */
+async function incrementViews(id) {
+  return postsCol.doc(id).update({
+    views: firebase.firestore.FieldValue.increment(1)
+  });
+}
+
 /** Sort a Firestore snapshot newest-first and return a compatible object */
 function sortedSnap(snap) {
   const docs = [];
@@ -211,6 +218,9 @@ function buildCard(id, data) {
     ? `<a class="card-post-link" href="${esc(data.postLink)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">🔗 ${esc(data.postLink)}</a>`
     : "";
 
+  const views = data.views || 0;
+  const viewsHtml = `<span class="card-views" title="${views} views">👁 ${views >= 1000 ? (views/1000).toFixed(1) + 'k' : views}</span>`;
+
   card.innerHTML = `
     <div class="card-header">
       ${avatarHtml}
@@ -219,6 +229,7 @@ function buildCard(id, data) {
         <div class="card-name">${esc(data.name)}</div>
         <div class="card-time">${formatTime(data.timestamp)}</div>
       </div>
+      ${viewsHtml}
     </div>
     <div class="card-comment">${esc(data.comment)}</div>
     ${commentImgHtml}

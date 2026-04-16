@@ -165,7 +165,10 @@
       snapshot.forEach(doc => {
         postsCache[doc.id] = doc.data();
         const card = buildCard(doc.id, doc.data());
-        card.addEventListener("click", () => openModal(doc.id, doc.data()));
+        card.addEventListener("click", () => {
+          incrementViews(doc.id).catch(() => {}); // fire & forget
+          openModal(doc.id, doc.data());
+        });
         feedList.appendChild(card);
       });
     });

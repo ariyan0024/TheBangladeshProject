@@ -784,6 +784,19 @@ footer {
 }
 .card-post-link:hover { color: var(--text); }
 
+/* ── Card View Count ──────────────────────────────────────── */
+.card-views {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: .72rem;
+  color: var(--subtle);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+
 /* ── Directory Page ───────────────────────────────────────── */
 .directory-layout {
   display: flex;

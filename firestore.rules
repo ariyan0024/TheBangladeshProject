@@ -14,7 +14,10 @@ service cloud.firestore {
                     && request.resource.data.comment is string;
 
       // Only authenticated admins can update or delete
-      allow update, delete: if request.auth != null;
+      // Exception: anyone can increment the 'views' counter
+      allow update: if request.auth != null
+                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']));
+      allow delete: if request.auth != null;
     }
   }
 }
