@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Submit an Entry — The Bangladesh Project</title>
+  <meta name="description" content="Submit a new entry to The Bangladesh Project public record." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="nav-logo">The Bangladesh Project</span>
+    <ul class="nav-links">
+      <li><a href="index.html">Feed</a></li>
+      <li><a href="directory.html">Directory</a></li>
+      <li><a href="submit.html" class="active">Submit</a></li>
+      <li><button class="nav-admin-btn" onclick="window.location.href='admin.html'">Admin</button></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ── Page Header ─────────────────────────────────────────── -->
+<div class="container">
+  <div class="page-header">
+    <h1>Submit an Entry</h1>
+    <p>All submissions are reviewed before appearing on the public feed.</p>
+  </div>
+
+  <!-- ── Form ─────────────────────────────────────────────── -->
+  <div class="form-card">
+
+    <div class="alert alert-success" id="success-msg" role="alert">
+      ✓ Your submission has been received. It will appear after review.
+    </div>
+    <div class="alert alert-error" id="error-msg" role="alert"></div>
+
+    <form id="submit-form" novalidate>
+
+      <!-- Name -->
+      <div class="form-group">
+        <label for="name">Full Name</label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          class="form-control"
+          placeholder="e.g. John Doe"
+          required
+          autocomplete="off"
+        />
+      </div>
+
+      <!-- Culprit Image -->
+      <div class="form-group">
+        <label>Profile / Culprit Image <span class="form-optional">(optional)</span></label>
+        <div class="upload-area">
+          <input type="file" id="img-file" accept="image/*" />
+          <label for="img-file" class="upload-label">
+            <img id="img-preview" class="upload-preview" alt="preview" />
+            📎 Click to upload an image
+          </label>
+        </div>
+        <p class="hint">Leave blank if no image is available.</p>
+      </div>
+
+      <!-- Comment -->
+      <div class="form-group">
+        <label for="comment">Comment / Description</label>
+        <textarea
+          id="comment"
+          name="comment"
+          class="form-control"
+          placeholder="Describe what happened…"
+          required
+        ></textarea>
+      </div>
+
+      <!-- Comment Image — MANDATORY -->
+      <div class="form-group">
+        <label>Comment Image <span style="font-size:.75rem;color:#cc0000">* required</span></label>
+        <div class="upload-area">
+          <input type="file" id="comment-img-file" accept="image/*" />
+          <label for="comment-img-file" class="upload-label">
+            <img id="comment-img-preview" class="upload-preview" alt="preview" />
+            📎 Click to upload evidence image
+          </label>
+        </div>
+        <p class="hint">Upload a screenshot or photo as evidence. Required.</p>
+      </div>
+
+      <!-- Post Link — optional -->
+      <div class="form-group">
+        <label for="post-link">
+          Post Link <span class="form-optional">(optional)</span>
+        </label>
+        <input
+          type="url"
+          id="post-link"
+          name="postLink"
+          class="form-control"
+          placeholder="https://facebook.com/post/…"
+        />
+        <p class="hint">Link to the original post, profile, or source.</p>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submit-btn" style="width:100%;justify-content:center">
+        Submit Entry
+      </button>
+      <p style="font-size:.75rem;color:var(--subtle);text-align:center;margin-top:12px">
+        By submitting you confirm this information is true and accurate to the best of your knowledge.
+      </p>
+    </form>
+  </div>
+</div>
+
+<!-- ── Footer ────────────────────────────────────────────────── -->
+<footer style="margin-top:60px">
+  <div class="container">
+    © The Bangladesh Project &mdash; <a href="index.html">Back to feed</a>
+  </div>
+</footer>
+
+<!-- ── Firebase ────────────────────────────────────────────── -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="app.js"></script>
+
+<script>
+const form       = document.getElementById("submit-form");
+const submitBtn  = document.getElementById("submit-btn");
+const successMsg = document.getElementById("success-msg");
+const errorMsg   = document.getElementById("error-msg");
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ── Profile image preview ───────────────────────────────── */
+const imgFile    = document.getElementById("img-file");
+const imgPreview = document.getElementById("img-preview");
+
+imgFile.addEventListener("change", async () => {
+  if (!imgFile.files[0]) return;
+  imgPreview.src = await fileToBase64(imgFile.files[0]);
+  imgPreview.style.display = "block";
+});
+
+/* ── Comment image preview ──────────────────────────────── */
+const commentImgFile    = document.getElementById("comment-img-file");
+const commentImgPreview = document.getElementById("comment-img-preview");
+
+commentImgFile.addEventListener("change", async () => {
+  if (!commentImgFile.files[0]) return;
+  commentImgPreview.src = await fileToBase64(commentImgFile.files[0]);
+  commentImgPreview.style.display = "block";
+});
+
+/* ── Form Submit ─────────────────────────────────────────── */
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  successMsg.classList.remove("show");
+  errorMsg.classList.remove("show");
+
+  const name    = document.getElementById("name").value.trim();
+  const comment = document.getElementById("comment").value.trim();
+  const postLink = document.getElementById("post-link").value.trim();
+
+  if (!name)    { showErr("Please enter a name."); document.getElementById("name").focus(); return; }
+  if (!comment) { showErr("Please enter a comment."); document.getElementById("comment").focus(); return; }
+
+  // Resolve images (file upload only)
+  let image = imgFile.files[0] ? await fileToBase64(imgFile.files[0]) : "";
+  let commentImage = commentImgFile.files[0] ? await fileToBase64(commentImgFile.files[0]) : "";
+
+  // Comment image is mandatory
+  if (!commentImage) {
+    showErr("Please upload a comment image. This is required.");
+    document.getElementById("comment-img-file").focus();
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Submitting…";
+
+  try {
+    await addPost({ name, image, comment, commentImage, postLink });
+    form.reset();
+    imgPreview.style.display = "none";
+    commentImgPreview.style.display = "none";
+    successMsg.classList.add("show");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (err) {
+    showErr("Submission failed: " + err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Submit Entry";
+  }
+});
+
+function showErr(msg) {
+  errorMsg.textContent = msg;
+  errorMsg.classList.add("show");
+}
+</script>
+</body>
+</html>

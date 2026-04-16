@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Directory — The Bangladesh Project</title>
+  <meta name="description" content="Browse the A–Z directory of all entries in The Bangladesh Project." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="nav-logo">The Bangladesh Project</span>
+    <ul class="nav-links">
+      <li><a href="index.html">Feed</a></li>
+      <li><a href="directory.html" class="active">Directory</a></li>
+      <li><a href="submit.html">Submit</a></li>
+      <li><button class="nav-admin-btn" onclick="window.location.href='admin.html'">Admin</button></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ── Page Header ─────────────────────────────────────────── -->
+<div style="max-width:820px;margin:0 auto;padding:0 20px">
+  <div class="page-header" style="text-align:left;padding-bottom:0">
+    <h1>Directory</h1>
+    <p>All verified entries, sorted A–Z. Tap a letter to jump to that section.</p>
+  </div>
+</div>
+
+<!-- ── Main layout ───────────────────────────────────────── -->
+<div class="directory-layout">
+
+  <!-- Left: searchable name list -->
+  <div class="dir-main" id="dir-main">
+
+    <!-- Sticky search bar -->
+    <div class="dir-search-wrap">
+      <input type="text" id="dir-search" class="form-control" placeholder="Search names…" autocomplete="off" />
+    </div>
+
+    <!-- Loader while fetching -->
+    <div id="dir-loader" class="loader"><div class="spinner"></div></div>
+
+    <!-- Content populated by JS -->
+    <div id="dir-content" style="display:none"></div>
+
+    <!-- Empty state -->
+    <p id="dir-empty" class="feed-empty" style="display:none">No approved entries yet.</p>
+  </div>
+
+  <!-- Right: vertical A-Z strip -->
+  <div class="alpha-strip" id="alpha-strip"></div>
+
+  <!-- Floating bubble shown while dragging -->
+  <div class="alpha-bubble" id="alpha-bubble">A</div>
+</div>
+
+<!-- ── Post modal ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-name" id="modal-title"></div>
+        <div class="modal-time" id="modal-sub" style="font-size:.8rem;color:var(--muted)"></div>
+      </div>
+      <button class="modal-close" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<footer>
+  <div style="max-width:820px;margin:0 auto;padding:0 20px;text-align:center;font-size:.78rem;color:var(--subtle)">
+    © The Bangladesh Project &mdash; <a href="submit.html">Submit an entry</a>
+  </div>
+</footer>
+
+<!-- ── Firebase ────────────────────────────────────────────── -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="app.js"></script>
+
+<script>
+// ============================================================
+//  DIRECTORY PAGE LOGIC — mobile contacts-style A-Z
+// ============================================================
+
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+/* grouped data: { A: [{id, data}, ...], B: [...], ... } */
+let grouped  = {};
+let allNames = []; // flat for search
+
+/* ── 1. Fetch all approved posts, group by first letter ─── */
+async function loadDirectory() {
+  const snap = await postsCol
+    .where("status", "==", "approved")
+    .orderBy("nameLower")
+    .get();
+
+  grouped  = {};
+  allNames = [];
+
+  snap.forEach(doc => {
+    const d = doc.data();
+    const fl = (d.nameLower || "?")[0].toUpperCase();
+    if (!grouped[fl]) grouped[fl] = {};
+    if (!grouped[fl][d.name]) grouped[fl][d.name] = [];
+    grouped[fl][d.name].push({ id: doc.id, data: d });
+    allNames.push(d.name);
+  });
+
+  document.getElementById("dir-loader").style.display = "none";
+
+  if (snap.empty) {
+    document.getElementById("dir-empty").style.display = "block";
+    return;
+  }
+
+  document.getElementById("dir-content").style.display = "block";
+  renderDirectory(grouped);
+  buildAlphaStrip();
+}
+loadDirectory();
+
+/* ── 2. Render all letter sections ─────────────────────── */
+function renderDirectory(data) {
+  const content = document.getElementById("dir-content");
+  content.innerHTML = "";
+
+  LETTERS.forEach(letter => {
+    const section = document.createElement("div");
+    section.className = "dir-letter-section";
+    section.id = `section-${letter}`;
+
+    const header = document.createElement("div");
+    header.className = "dir-letter-header";
+    header.textContent = letter;
+    section.appendChild(header);
+
+    const names = data[letter];
+    if (!names || Object.keys(names).length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "dir-empty-letter";
+      empty.textContent = "—";
+      section.appendChild(empty);
+    } else {
+      Object.keys(names).sort().forEach(name => {
+        const posts  = names[name];
+        const sample = posts[0].data;
+
+        const row = document.createElement("div");
+        row.className = "dir-name-row";
+
+        const imgHtml = sample.image
+          ? `<img class="dir-name-avatar" src="${esc(sample.image)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="dir-name-initial" style="display:none">${esc(getInitial(name))}</div>`
+          : `<div class="dir-name-initial">${esc(getInitial(name))}</div>`;
+
+        row.innerHTML = `
+          ${imgHtml}
+          <span class="dir-name-text">${esc(name)}</span>
+          <span class="dir-name-count">${posts.length} ${posts.length === 1 ? "entry" : "entries"}</span>
+        `;
+
+        row.addEventListener("click", () => openNameModal(name, posts));
+        section.appendChild(row);
+      });
+    }
+
+    content.appendChild(section);
+  });
+}
+
+/* ── 3. Build vertical alpha strip ─────────────────────── */
+function buildAlphaStrip() {
+  const strip  = document.getElementById("alpha-strip");
+  const bubble = document.getElementById("alpha-bubble");
+  strip.innerHTML = "";
+
+  LETTERS.forEach(letter => {
+    const el = document.createElement("div");
+    el.className = "alpha-strip-letter";
+    el.textContent = letter;
+    el.dataset.letter = letter;
+    strip.appendChild(el);
+  });
+
+  /* ── Touch drag (mobile contacts feel) ───────────────── */
+  let isDragging = false;
+
+  function letterFromY(y) {
+    const els = strip.querySelectorAll(".alpha-strip-letter");
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (y >= r.top && y <= r.bottom) return el.dataset.letter;
+    }
+    return null;
+  }
+
+  function jumpTo(letter) {
+    if (!letter) return;
+    // Highlight strip letter
+    strip.querySelectorAll(".alpha-strip-letter").forEach(el => {
+      el.classList.toggle("touching", el.dataset.letter === letter);
+    });
+    // Show bubble
+    const el = strip.querySelector(`[data-letter="${letter}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      bubble.textContent = letter;
+      bubble.style.top   = (r.top + r.height / 2 - 26) + "px";
+      bubble.classList.add("visible");
+    }
+    // Scroll section into view
+    const sec = document.getElementById(`section-${letter}`);
+    if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function endDrag() {
+    isDragging = false;
+    strip.querySelectorAll(".alpha-strip-letter").forEach(el => el.classList.remove("touching"));
+    setTimeout(() => bubble.classList.remove("visible"), 400);
+  }
+
+  // Touch events
+  strip.addEventListener("touchstart", e => {
+    e.preventDefault();
+    isDragging = true;
+    jumpTo(letterFromY(e.touches[0].clientY));
+  }, { passive: false });
+
+  strip.addEventListener("touchmove", e => {
+    e.preventDefault();
+    if (!isDragging) return;
+    jumpTo(letterFromY(e.touches[0].clientY));
+  }, { passive: false });
+
+  strip.addEventListener("touchend", endDrag);
+
+  // Mouse events
+  strip.addEventListener("mousedown", e => { isDragging = true; jumpTo(letterFromY(e.clientY)); });
+  strip.addEventListener("mousemove", e => { if (isDragging) jumpTo(letterFromY(e.clientY)); });
+  window.addEventListener("mouseup",  endDrag);
+
+  // Simple click
+  strip.querySelectorAll(".alpha-strip-letter").forEach(el => {
+    el.addEventListener("click", () => jumpTo(el.dataset.letter));
+  });
+}
+
+/* ── 4. Open name modal: show all posts for that person ── */
+const overlay  = document.getElementById("modal-overlay");
+const modalClose = document.getElementById("modal-close");
+let nameSub = null;
+
+function openNameModal(name, posts) {
+  document.getElementById("modal-title").textContent = name;
+  document.getElementById("modal-sub").textContent   = `${posts.length} ${posts.length === 1 ? "entry" : "entries"}`;
+
+  const body = document.getElementById("modal-body");
+  body.innerHTML = "";
+
+  posts.forEach(({ id, data }) => {
+    // Mini post card inside modal
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px";
+
+    const commentImgHtml = data.commentImage
+      ? `<img src="${esc(data.commentImage)}" style="width:100%;border-radius:6px;margin-top:10px;border:1px solid var(--border)" onerror="this.remove()" loading="lazy" />`
+      : "";
+
+    const postLinkHtml = data.postLink
+      ? `<a href="${esc(data.postLink)}" target="_blank" rel="noopener noreferrer" class="card-post-link" onclick="event.stopPropagation()" style="display:block;margin-top:8px">🔗 ${esc(data.postLink)}</a>`
+      : "";
+
+    const copyId = `copy-${id}`;
+    wrap.innerHTML = `
+      <div style="font-size:.75rem;color:var(--subtle);margin-bottom:8px">${formatTime(data.timestamp)}</div>
+      <div style="font-size:.88rem;white-space:pre-wrap;word-break:break-word">${esc(data.comment)}</div>
+      ${commentImgHtml}
+      ${postLinkHtml}
+      <div style="margin-top:10px;display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm" id="${copyId}">🔗 Copy link</button>
+      </div>
+    `;
+    wrap.querySelector(`#${copyId}`).addEventListener("click", () => {
+      copyToClipboard(`${location.origin}/index.html?post=${id}`);
+    });
+    body.appendChild(wrap);
+  });
+
+  overlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+modalClose.addEventListener("click", () => {
+  overlay.classList.remove("open");
+  document.body.style.overflow = "";
+});
+overlay.addEventListener("click", e => {
+  if (e.target === overlay) { overlay.classList.remove("open"); document.body.style.overflow = ""; }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { overlay.classList.remove("open"); document.body.style.overflow = ""; }
+});
+
+/* ── 5. Search ────────────────────────────────────────── */
+document.getElementById("dir-search").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase().trim();
+  const content = document.getElementById("dir-content");
+
+  if (!q) {
+    // Reset to full directory
+    renderDirectory(grouped);
+    buildAlphaStrip();
+    return;
+  }
+
+  // Filter: show only matching names across all letters
+  const filtered = {};
+  LETTERS.forEach(letter => {
+    if (!grouped[letter]) return;
+    const matches = {};
+    Object.keys(grouped[letter]).forEach(name => {
+      if (name.toLowerCase().includes(q)) matches[name] = grouped[letter][name];
+    });
+    if (Object.keys(matches).length) filtered[letter] = matches;
+  });
+
+  renderDirectory(filtered);
+});
+</script>
+</body>
+</html>

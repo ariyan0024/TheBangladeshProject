@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — The Bangladesh Project</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── Login Screen ─────────────────────────────────────── -->
+<div class="auth-screen" id="auth-screen">
+  <div class="form-card" style="width:100%;max-width:380px">
+    <div style="text-align:center;margin-bottom:28px">
+      <div class="nav-logo" style="font-size:.8rem;margin-bottom:8px">The Bangladesh Project</div>
+      <h1 style="font-size:1.4rem;font-weight:700">Admin Login</h1>
+    </div>
+    <div class="alert alert-error" id="login-error"></div>
+    <form id="login-form" novalidate>
+      <div class="form-group">
+        <label for="admin-email">Email</label>
+        <input type="email" id="admin-email" class="form-control" placeholder="admin@example.com" required />
+      </div>
+      <div class="form-group">
+        <label for="admin-password">Password</label>
+        <input type="password" id="admin-password" class="form-control" placeholder="••••••••" required />
+      </div>
+      <button type="submit" class="btn btn-primary" id="login-btn" style="width:100%;justify-content:center">Sign In</button>
+    </form>
+    <p style="text-align:center;margin-top:16px;font-size:.8rem">
+      <a href="index.html" style="color:var(--muted)">← Back to site</a>
+    </p>
+  </div>
+</div>
+
+<!-- ── Admin Panel ───────────────────────────────────────── -->
+<div class="admin-layout" id="admin-panel" style="display:none">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">Admin Panel</div>
+    <ul class="admin-nav">
+      <li class="admin-nav-item">
+        <button class="admin-nav-btn active" data-tab="pending">
+          Pending
+          <span class="admin-nav-badge" id="pending-badge" style="display:none">0</span>
+        </button>
+      </li>
+      <li class="admin-nav-item">
+        <button class="admin-nav-btn" data-tab="entries">Live Entries</button>
+      </li>
+    </ul>
+    <div style="padding:16px 20px;position:absolute;bottom:0;width:100%;border-top:1px solid var(--border)">
+      <div id="admin-email-label" style="font-size:.72rem;color:var(--subtle);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <a href="index.html" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;text-align:center">← Site</a>
+        <button class="btn btn-outline btn-sm" id="logout-btn" style="flex:1;justify-content:center">Sign Out</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main">
+
+    <!-- ── Pending Tab ──────────────────────────────────── -->
+    <div id="tab-pending">
+      <div class="admin-header">
+        <h1>Pending Submissions</h1>
+      </div>
+      <div class="admin-search" style="margin-bottom:16px">
+        <input type="text" id="pending-search" class="form-control" placeholder="Filter by name…" />
+      </div>
+      <div id="pending-list"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- ── Live Entries Tab ─────────────────────────────── -->
+    <div id="tab-entries" style="display:none">
+      <div class="admin-header">
+        <h1>Live Entries</h1>
+        <span style="font-size:.82rem;color:var(--muted)">Publicly visible on the feed</span>
+      </div>
+      <div class="admin-search" style="margin-bottom:16px">
+        <input type="text" id="entries-search" class="form-control" placeholder="Search by name…" />
+      </div>
+      <div id="entries-list"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── Edit Modal ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="edit-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div style="font-size:1.1rem;font-weight:700">Edit Post</div>
+      <button class="modal-close" id="edit-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="edit-form">
+        <input type="hidden" id="edit-id" />
+        <div class="form-group">
+          <label for="edit-name">Name</label>
+          <input type="text" id="edit-name" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label for="edit-comment">Comment</label>
+          <textarea id="edit-comment" class="form-control"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="edit-image">Profile Image URL</label>
+          <input type="url" id="edit-image" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label for="edit-comment-image">Comment Image URL</label>
+          <input type="url" id="edit-comment-image" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label for="edit-post-link">Post Link</label>
+          <input type="url" id="edit-post-link" class="form-control" />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Save Changes</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Firebase ────────────────────────────────────────────── -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="app.js"></script>
+
+<script>
+// ============================================================
+//  ADMIN PAGE LOGIC
+// ============================================================
+
+let unsubPending  = null;
+let unsubEntries  = null;
+
+/* ── Auth ──────────────────────────────────────────────────── */
+const loginError = document.getElementById("login-error");
+const loginBtn   = document.getElementById("login-btn");
+
+onAuthChange(user => {
+  document.getElementById("auth-screen").style.display  = user ? "none" : "flex";
+  document.getElementById("admin-panel").style.display  = user ? "flex" : "none";
+  if (user) {
+    document.getElementById("admin-email-label").textContent = user.email;
+    startListeners();
+  } else {
+    if (unsubPending)  { unsubPending();  unsubPending  = null; }
+    if (unsubEntries)  { unsubEntries();  unsubEntries  = null; }
+  }
+});
+
+document.getElementById("login-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  loginError.classList.remove("show");
+  const email    = document.getElementById("admin-email").value.trim();
+  const password = document.getElementById("admin-password").value;
+  loginBtn.disabled = true; loginBtn.textContent = "Signing in…";
+  try { await signIn(email, password); }
+  catch (err) { loginError.textContent = err.message; loginError.classList.add("show"); }
+  finally { loginBtn.disabled = false; loginBtn.textContent = "Sign In"; }
+});
+
+document.getElementById("logout-btn").addEventListener("click", async () => {
+  await signOut(); showToast("Signed out.");
+});
+
+/* ── Tabs ───────────────────────────────────────────────────── */
+document.querySelectorAll(".admin-nav-btn[data-tab]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".admin-nav-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-pending").style.display = btn.dataset.tab === "pending"  ? "" : "none";
+    document.getElementById("tab-entries").style.display = btn.dataset.tab === "entries"  ? "" : "none";
+  });
+});
+
+/* ── Listeners ─────────────────────────────────────────────── */
+function startListeners() {
+  // Pending
+  unsubPending = subscribePendingPosts(snap => {
+    const badge = document.getElementById("pending-badge");
+    badge.textContent = snap.size;
+    badge.style.display = snap.size ? "" : "none";
+    renderList("pending-list", snap, "pending");
+  });
+  // Live entries (approved)
+  unsubEntries = subscribeApprovedAdmin(snap => {
+    renderList("entries-list", snap, "entries");
+  });
+}
+
+/* ── Render list ───────────────────────────────────────────── */
+function renderList(containerId, snapshot, type) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  if (snapshot.empty) {
+    container.innerHTML = `<p style="color:var(--subtle);padding:32px;text-align:center;font-size:.88rem">No ${type === "pending" ? "pending submissions" : "live entries"} yet.</p>`;
+    return;
+  }
+  snapshot.forEach(doc => container.appendChild(buildAdminCard(doc.id, doc.data(), type)));
+  // Re-apply search
+  const q = document.getElementById(type === "pending" ? "pending-search" : "entries-search").value.toLowerCase().trim();
+  if (q) filterList(containerId, q);
+}
+
+/* ── Admin card ─────────────────────────────────────────────── */
+function buildAdminCard(id, data, type) {
+  const card = document.createElement("div");
+  card.className = "admin-card";
+  card.dataset.name = (data.name || "").toLowerCase();
+
+  const avatarHtml = data.image
+    ? `<img class="admin-card-avatar" src="${esc(data.image)}" alt="" onerror="this.style.display='none'" />`
+    : `<div class="admin-card-avatar" style="display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:var(--muted)">${esc(getInitial(data.name))}</div>`;
+
+  const commentImgHtml = data.commentImage
+    ? `<img class="admin-card-image" src="${esc(data.commentImage)}" alt="" onerror="this.remove()" />`
+    : "";
+
+  const postLinkHtml = data.postLink
+    ? `<a href="${esc(data.postLink)}" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:6px;display:inline-block">🔗 ${esc(data.postLink)}</a>`
+    : "";
+
+  const isPending = type === "pending";
+  const actionsHtml = isPending
+    ? `<button class="btn btn-primary btn-sm" data-action="approve" data-id="${id}">✓ Approve</button>
+       <button class="btn btn-danger  btn-sm" data-action="reject"  data-id="${id}">✕ Reject</button>`
+    : `<button class="btn btn-outline btn-sm" data-action="edit"   data-id="${id}">✎ Edit</button>
+       <button class="btn btn-danger  btn-sm" data-action="delete" data-id="${id}">🗑 Delete</button>`;
+
+  card.innerHTML = `
+    ${avatarHtml}
+    <div class="admin-card-body">
+      <div class="admin-card-name">${esc(data.name)}</div>
+      <div class="admin-card-meta">${formatTime(data.timestamp)}${data.reports ? ` · ⚑ ${data.reports} report(s)` : ""}</div>
+      <div class="admin-card-comment">${esc(data.comment)}</div>
+      ${commentImgHtml}
+      ${postLinkHtml}
+      <div class="admin-card-actions" style="margin-top:10px">${actionsHtml}</div>
+    </div>
+  `;
+
+  card.querySelectorAll("[data-action]").forEach(btn => {
+    btn.addEventListener("click", () => handleAction(btn.dataset.action, btn.dataset.id, data));
+  });
+  return card;
+}
+
+/* ── Actions ─────────────────────────────────────────────────── */
+async function handleAction(action, id, data) {
+  if (action === "approve") {
+    try { await approvePost(id); showToast("✓ Post approved — now live."); }
+    catch (e) { showToast("Error: " + e.message); }
+  } else if (action === "reject" || action === "delete") {
+    const label = action === "delete" ? "delete this live entry" : "reject this submission";
+    if (!confirm(`Are you sure you want to ${label}? This cannot be undone.`)) return;
+    try { await deletePost(id); showToast("Post deleted."); }
+    catch (e) { showToast("Error: " + e.message); }
+  } else if (action === "edit") {
+    openEditModal(id, data);
+  }
+}
+
+/* ── Search ──────────────────────────────────────────────────── */
+function filterList(containerId, query) {
+  document.querySelectorAll(`#${containerId} .admin-card`).forEach(card => {
+    card.style.display = card.dataset.name.includes(query) ? "" : "none";
+  });
+}
+document.getElementById("pending-search").addEventListener("input", e => filterList("pending-list", e.target.value.toLowerCase().trim()));
+document.getElementById("entries-search").addEventListener("input", e => filterList("entries-list", e.target.value.toLowerCase().trim()));
+
+/* ── Edit Modal ──────────────────────────────────────────────── */
+const editOverlay = document.getElementById("edit-overlay");
+const editClose   = document.getElementById("edit-close");
+const editForm    = document.getElementById("edit-form");
+
+function openEditModal(id, data) {
+  document.getElementById("edit-id").value             = id;
+  document.getElementById("edit-name").value           = data.name         || "";
+  document.getElementById("edit-comment").value        = data.comment      || "";
+  document.getElementById("edit-image").value          = data.image        || "";
+  document.getElementById("edit-comment-image").value  = data.commentImage || "";
+  document.getElementById("edit-post-link").value      = data.postLink     || "";
+  editOverlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+editClose.addEventListener("click", closeEditModal);
+editOverlay.addEventListener("click", e => { if (e.target === editOverlay) closeEditModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeEditModal(); });
+
+function closeEditModal() { editOverlay.classList.remove("open"); document.body.style.overflow = ""; }
+
+editForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const id           = document.getElementById("edit-id").value;
+  const name         = document.getElementById("edit-name").value.trim();
+  const comment      = document.getElementById("edit-comment").value.trim();
+  const image        = document.getElementById("edit-image").value.trim();
+  const commentImage = document.getElementById("edit-comment-image").value.trim();
+  const postLink     = document.getElementById("edit-post-link").value.trim();
+  if (!name || !comment) { showToast("Name and comment are required."); return; }
+  try {
+    await updatePost(id, { name, nameLower: name.toLowerCase(), comment, image, commentImage, postLink });
+    closeEditModal(); showToast("Post updated.");
+  } catch (err) { showToast("Error: " + err.message); }
+});
+</script>
+</body>
+</html>
