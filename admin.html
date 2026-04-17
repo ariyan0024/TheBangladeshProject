@@ -42,21 +42,14 @@
   <aside class="admin-sidebar">
     <div class="admin-sidebar-logo">Admin Panel</div>
     <ul class="admin-nav">
-      <li>
-        <button class="admin-nav-btn active" data-tab="pending">
-          Pending
-          <span class="admin-nav-badge" id="pending-badge" style="display:none">0</span>
-        </button>
-      </li>
-      <li>
-        <button class="admin-nav-btn" data-tab="entries">Live Entries</button>
-      </li>
-      <li>
-        <button class="admin-nav-btn" data-tab="flagged">
-          Flagged
-          <span class="admin-nav-badge" id="flagged-badge" style="display:none;background:#b45309">0</span>
-        </button>
-      </li>
+      <li><button class="admin-nav-btn active" data-tab="pending">
+        Pending <span class="admin-nav-badge" id="pending-badge" style="display:none">0</span>
+      </button></li>
+      <li><button class="admin-nav-btn" data-tab="entries">Live Entries</button></li>
+      <li><button class="admin-nav-btn" data-tab="flagged">
+        Flagged <span class="admin-nav-badge" id="flagged-badge" style="display:none;background:#b45309">0</span>
+      </button></li>
+      <li><button class="admin-nav-btn" data-tab="tags">Manage Tags</button></li>
     </ul>
     <div style="padding:14px 16px;border-top:1px solid var(--border);margin-top:auto">
       <div id="admin-email-label" style="font-size:.7rem;color:var(--subtle);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
@@ -73,9 +66,7 @@
 
     <!-- ── Pending Tab ────────────────────────────────────── -->
     <div id="tab-pending">
-      <div class="admin-header">
-        <h1>Pending Submissions</h1>
-      </div>
+      <div class="admin-header"><h1>Pending Submissions</h1></div>
       <div class="admin-search" style="margin-bottom:16px">
         <input type="text" id="pending-search" class="form-control" placeholder="Filter by name…" />
       </div>
@@ -86,7 +77,7 @@
     <div id="tab-entries" style="display:none">
       <div class="admin-header">
         <h1>Live Entries</h1>
-        <span style="font-size:.82rem;color:var(--muted)">Publicly visible on the feed</span>
+        <span style="font-size:.82rem;color:var(--muted)">Publicly visible</span>
       </div>
       <div class="admin-search" style="margin-bottom:16px">
         <input type="text" id="entries-search" class="form-control" placeholder="Search by name…" />
@@ -98,12 +89,45 @@
     <div id="tab-flagged" style="display:none">
       <div class="admin-header">
         <h1>Flagged Posts</h1>
-        <span style="font-size:.82rem;color:#b45309">Posts with ≥10 reports — review &amp; decide</span>
+        <span style="font-size:.82rem;color:#b45309">≥10 reports — review &amp; decide</span>
       </div>
       <div class="admin-search" style="margin-bottom:16px">
         <input type="text" id="flagged-search" class="form-control" placeholder="Filter by name…" />
       </div>
       <div id="flagged-list"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- ── Tags Tab ───────────────────────────────────────── -->
+    <div id="tab-tags" style="display:none">
+      <div class="admin-header" style="margin-bottom:20px">
+        <h1>Manage Tags</h1>
+        <button class="btn btn-primary btn-sm" id="add-tag-btn">+ Add Tag</button>
+      </div>
+      <p style="font-size:.84rem;color:var(--muted);margin-bottom:18px">
+        Create, edit, or delete the category tags used to classify entries. Changes affect new submissions instantly.
+      </p>
+
+      <!-- Existing tags list -->
+      <div id="admin-tags-list"></div>
+
+      <!-- Add / Edit form (hidden by default) -->
+      <div id="admin-tag-form" style="display:none;border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;background:var(--card-bg)">
+        <div style="font-size:.88rem;font-weight:700;margin-bottom:14px" id="tag-form-title">Add New Tag</div>
+        <input type="hidden" id="tag-edit-idx" value="" />
+        <div class="form-group">
+          <label for="tag-form-label">Label</label>
+          <input type="text" id="tag-form-label" class="form-control" placeholder="e.g. Harassment" maxlength="30" />
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <div class="tag-color-palette" id="tag-color-palette"></div>
+          <input type="hidden" id="tag-form-color" value="#c53030" />
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="btn btn-primary btn-sm" id="tag-form-save">Save Tag</button>
+          <button class="btn btn-ghost btn-sm" id="tag-form-cancel">Cancel</button>
+        </div>
+      </div>
     </div>
 
   </main>
@@ -126,6 +150,12 @@
         <div class="form-group">
           <label for="edit-comment">Comment</label>
           <textarea id="edit-comment" class="form-control"></textarea>
+        </div>
+        <!-- Tag picker in edit modal -->
+        <div class="form-group">
+          <label>Category Tag</label>
+          <div id="edit-tag-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+          <input type="hidden" id="edit-tag" />
         </div>
         <div class="form-group">
           <label for="edit-image">Profile Image URL</label>
@@ -158,20 +188,27 @@
 <script>
 applyTheme();
 
+// ── Color palette for tag editor ───────────────────────────
+const PALETTE = [
+  "#c53030","#9b2c2c","#b7791f","#744210",
+  "#276749","#2f855a","#2b6cb0","#2c5282",
+  "#553c9a","#6b46c1","#97266d","#4a5568",
+];
+
 let unsubPending = null;
 let unsubEntries = null;
 let unsubFlagged = null;
 
 /* ── Auth ──────────────────────────────────────────────────── */
-const loginError = document.getElementById("login-error");
-const loginBtn   = document.getElementById("login-btn");
-
-onAuthChange(user => {
+onAuthChange(async user => {
   document.getElementById("auth-screen").style.display = user ? "none" : "flex";
-  document.getElementById("admin-panel").style.display = user ? "flex" : "none";
+  document.getElementById("admin-panel").style.display  = user ? "flex"  : "none";
   if (user) {
     document.getElementById("admin-email-label").textContent = user.email;
+    await loadTags();
+    buildEditTagChips();
     startListeners();
+    renderTagsTab();
   } else {
     if (unsubPending) { unsubPending(); unsubPending = null; }
     if (unsubEntries) { unsubEntries(); unsubEntries = null; }
@@ -181,9 +218,11 @@ onAuthChange(user => {
 
 document.getElementById("login-form").addEventListener("submit", async e => {
   e.preventDefault();
+  const loginError = document.getElementById("login-error");
   loginError.classList.remove("show");
   const email    = document.getElementById("admin-email").value.trim();
   const password = document.getElementById("admin-password").value;
+  const loginBtn = document.getElementById("login-btn");
   loginBtn.disabled = true; loginBtn.textContent = "Signing in…";
   try { await signIn(email, password); }
   catch (err) { loginError.textContent = err.message; loginError.classList.add("show"); }
@@ -199,9 +238,9 @@ document.querySelectorAll(".admin-nav-btn[data-tab]").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".admin-nav-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
-    document.getElementById("tab-pending").style.display = btn.dataset.tab === "pending" ? "" : "none";
-    document.getElementById("tab-entries").style.display = btn.dataset.tab === "entries" ? "" : "none";
-    document.getElementById("tab-flagged").style.display = btn.dataset.tab === "flagged" ? "" : "none";
+    ["pending","entries","flagged","tags"].forEach(t => {
+      document.getElementById("tab-" + t).style.display = btn.dataset.tab === t ? "" : "none";
+    });
   });
 });
 
@@ -209,8 +248,7 @@ document.querySelectorAll(".admin-nav-btn[data-tab]").forEach(btn => {
 function startListeners() {
   unsubPending = subscribePendingPosts(snap => {
     const badge = document.getElementById("pending-badge");
-    badge.textContent  = snap.size;
-    badge.style.display = snap.size ? "" : "none";
+    badge.textContent = snap.size; badge.style.display = snap.size ? "" : "none";
     renderList("pending-list", snap, "pending");
   });
   unsubEntries = subscribeApprovedAdmin(snap => {
@@ -218,11 +256,20 @@ function startListeners() {
   });
   unsubFlagged = subscribeFlaggedPosts(snap => {
     const badge = document.getElementById("flagged-badge");
-    badge.textContent  = snap.size;
-    badge.style.display = snap.size ? "" : "none";
+    badge.textContent = snap.size; badge.style.display = snap.size ? "" : "none";
     renderList("flagged-list", snap, "flagged");
   });
 }
+
+/* ── Search ──────────────────────────────────────────────────── */
+function filterList(containerId, query) {
+  document.querySelectorAll(`#${containerId} .admin-card`).forEach(card => {
+    card.style.display = card.dataset.name.includes(query) ? "" : "none";
+  });
+}
+document.getElementById("pending-search").addEventListener("input", e => filterList("pending-list", e.target.value.toLowerCase().trim()));
+document.getElementById("entries-search").addEventListener("input", e => filterList("entries-list", e.target.value.toLowerCase().trim()));
+document.getElementById("flagged-search").addEventListener("input", e => filterList("flagged-list", e.target.value.toLowerCase().trim()));
 
 /* ── Render list ───────────────────────────────────────────── */
 function renderList(containerId, snapshot, type) {
@@ -234,9 +281,6 @@ function renderList(containerId, snapshot, type) {
     return;
   }
   snapshot.forEach(doc => container.appendChild(buildAdminCard(doc.id, doc.data(), type)));
-  const searchId = { pending: "pending-search", entries: "entries-search", flagged: "flagged-search" }[type];
-  const q = searchId ? document.getElementById(searchId).value.toLowerCase().trim() : "";
-  if (q) filterList(containerId, q);
 }
 
 /* ── Admin card ─────────────────────────────────────────────── */
@@ -255,7 +299,7 @@ function buildAdminCard(id, data, type) {
 
   const tagInfo = data.tag ? getTagInfo(data.tag) : null;
   const tagHtml = tagInfo
-    ? `<span class="tag-badge tag-${esc(tagInfo.id)}" style="margin-bottom:6px">${tagInfo.emoji} ${esc(tagInfo.label)}</span>`
+    ? `<span class="tag-badge" style="color:${esc(tagInfo.color)};border-color:${esc(tagInfo.color)};margin-bottom:6px">${esc(tagInfo.label)}</span>`
     : "";
 
   const profileLinkHtml = data.profileLink
@@ -264,6 +308,14 @@ function buildAdminCard(id, data, type) {
 
   const postLinkHtml = data.postLink
     ? `<a href="${esc(data.postLink)}" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:4px;display:inline-block">🔗 ${esc(data.postLink)}</a>`
+    : "";
+
+  const reportsHtml = data.reports
+    ? `<span style="font-size:.72rem;color:#b45309;margin-left:6px">⚑ ${data.reports} report${data.reports > 1 ? "s" : ""}</span>`
+    : "";
+
+  const viewsHtml = data.views
+    ? `<span style="font-size:.72rem;color:var(--subtle);margin-left:6px">· ${data.views} views</span>`
     : "";
 
   let actionsHtml;
@@ -281,15 +333,11 @@ function buildAdminCard(id, data, type) {
       <button class="btn btn-danger  btn-sm" data-action="delete" data-id="${id}">🗑 Delete</button>`;
   }
 
-  const reportsHtml = data.reports
-    ? `<span style="font-size:.72rem;color:#b45309;margin-left:6px">⚑ ${data.reports} report${data.reports > 1 ? "s" : ""}</span>`
-    : "";
-
   card.innerHTML = `
     ${avatarHtml}
     <div class="admin-card-body">
       <div class="admin-card-name">${esc(data.name)}</div>
-      <div class="admin-card-meta">${formatTime(data.timestamp)}${reportsHtml}</div>
+      <div class="admin-card-meta">${formatTime(data.timestamp)}${reportsHtml}${viewsHtml}</div>
       ${tagHtml}
       ${profileLinkHtml}
       <div class="admin-card-comment">${esc(data.comment)}</div>
@@ -310,39 +358,48 @@ async function handleAction(action, id, data) {
   if (action === "approve") {
     try { await approvePost(id); showToast("✓ Post approved — now live."); }
     catch (e) { showToast("Error: " + e.message); }
-
   } else if (action === "restore") {
-    // Re-approve a flagged post and reset reports
-    try {
-      await updatePost(id, { status: "approved", reports: 0 });
-      showToast("✓ Post restored to live feed.");
-    } catch (e) { showToast("Error: " + e.message); }
-
+    try { await updatePost(id, { status: "approved", reports: 0 }); showToast("✓ Post restored."); }
+    catch (e) { showToast("Error: " + e.message); }
   } else if (action === "reject" || action === "delete") {
-    const label = action === "delete" ? "delete this entry" : "reject this submission";
-    if (!confirm(`Are you sure you want to ${label}? This cannot be undone.`)) return;
+    if (!confirm(`Are you sure you want to ${action === "delete" ? "delete" : "reject"} this? This cannot be undone.`)) return;
     try { await deletePost(id); showToast("Post deleted."); }
     catch (e) { showToast("Error: " + e.message); }
-
   } else if (action === "edit") {
     openEditModal(id, data);
   }
 }
 
-/* ── Search ──────────────────────────────────────────────────── */
-function filterList(containerId, query) {
-  document.querySelectorAll(`#${containerId} .admin-card`).forEach(card => {
-    card.style.display = card.dataset.name.includes(query) ? "" : "none";
-  });
-}
-document.getElementById("pending-search").addEventListener("input", e => filterList("pending-list", e.target.value.toLowerCase().trim()));
-document.getElementById("entries-search").addEventListener("input", e => filterList("entries-list", e.target.value.toLowerCase().trim()));
-document.getElementById("flagged-search").addEventListener("input", e => filterList("flagged-list", e.target.value.toLowerCase().trim()));
-
 /* ── Edit Modal ──────────────────────────────────────────────── */
 const editOverlay = document.getElementById("edit-overlay");
 const editClose   = document.getElementById("edit-close");
 const editForm    = document.getElementById("edit-form");
+
+function buildEditTagChips() {
+  const wrap = document.getElementById("edit-tag-chips");
+  wrap.innerHTML = "";
+  TAGS.forEach(t => {
+    const chip = document.createElement("button");
+    chip.type        = "button";
+    chip.className   = "tag-chip";
+    chip.dataset.tag = t.id;
+    chip.textContent = t.label;
+    chip.style.fontSize = ".75rem";
+    chip.style.padding  = "4px 10px";
+    chip.addEventListener("click", () => {
+      wrap.querySelectorAll(".tag-chip").forEach(c => {
+        c.classList.remove("selected");
+        c.style.background = ""; c.style.color = ""; c.style.borderColor = "";
+      });
+      chip.classList.add("selected");
+      chip.style.background  = t.color;
+      chip.style.color       = "#fff";
+      chip.style.borderColor = t.color;
+      document.getElementById("edit-tag").value = t.id;
+    });
+    wrap.appendChild(chip);
+  });
+}
 
 function openEditModal(id, data) {
   document.getElementById("edit-id").value            = id;
@@ -352,14 +409,30 @@ function openEditModal(id, data) {
   document.getElementById("edit-comment-image").value = data.commentImage || "";
   document.getElementById("edit-post-link").value     = data.postLink     || "";
   document.getElementById("edit-profile-link").value  = data.profileLink  || "";
+  document.getElementById("edit-tag").value           = data.tag          || "";
+
+  // Pre-select current tag chip
+  const wrap = document.getElementById("edit-tag-chips");
+  wrap.querySelectorAll(".tag-chip").forEach(c => {
+    c.classList.remove("selected");
+    c.style.background = ""; c.style.color = ""; c.style.borderColor = "";
+    if (c.dataset.tag === data.tag) {
+      const t = getTagInfo(data.tag);
+      c.classList.add("selected");
+      c.style.background  = t.color;
+      c.style.color       = "#fff";
+      c.style.borderColor = t.color;
+    }
+  });
+
   editOverlay.classList.add("open");
   document.body.style.overflow = "hidden";
 }
 
+function closeEditModal() { editOverlay.classList.remove("open"); document.body.style.overflow = ""; }
 editClose.addEventListener("click", closeEditModal);
 editOverlay.addEventListener("click", e => { if (e.target === editOverlay) closeEditModal(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeEditModal(); });
-function closeEditModal() { editOverlay.classList.remove("open"); document.body.style.overflow = ""; }
 
 editForm.addEventListener("submit", async e => {
   e.preventDefault();
@@ -370,12 +443,120 @@ editForm.addEventListener("submit", async e => {
   const commentImage = document.getElementById("edit-comment-image").value.trim();
   const postLink     = document.getElementById("edit-post-link").value.trim();
   const profileLink  = document.getElementById("edit-profile-link").value.trim();
+  const tag          = document.getElementById("edit-tag").value;
   if (!name || !comment) { showToast("Name and comment are required."); return; }
   try {
-    await updatePost(id, { name, nameLower: name.toLowerCase(), comment, image, commentImage, postLink, profileLink });
+    await updatePost(id, { name, nameLower: name.toLowerCase(), comment, image, commentImage, postLink, profileLink, tag });
     closeEditModal(); showToast("Post updated.");
   } catch (err) { showToast("Error: " + err.message); }
 });
+
+/* ── Tags Tab ─────────────────────────────────────────────────── */
+function renderTagsTab() {
+  const list = document.getElementById("admin-tags-list");
+  list.innerHTML = "";
+  if (TAGS.length === 0) {
+    list.innerHTML = '<p style="color:var(--subtle);font-size:.85rem">No tags yet. Add one below.</p>';
+    return;
+  }
+  TAGS.forEach((t, idx) => {
+    const row = document.createElement("div");
+    row.className = "admin-tag-row";
+    row.innerHTML = `
+      <div class="admin-tag-swatch" style="background:${esc(t.color)}"></div>
+      <span class="admin-tag-label">${esc(t.label)}</span>
+      <span class="admin-tag-id">${esc(t.id)}</span>
+      <button class="btn btn-ghost btn-sm" data-action="edit-tag" data-idx="${idx}">✎</button>
+      <button class="btn btn-danger btn-sm" data-action="delete-tag" data-idx="${idx}">✕</button>
+    `;
+    row.querySelector("[data-action='edit-tag']").addEventListener("click", () => openTagForm(idx));
+    row.querySelector("[data-action='delete-tag']").addEventListener("click", () => deleteTag(idx));
+    list.appendChild(row);
+  });
+}
+
+// Build colour palette swatches
+function buildPalette(selectedColor) {
+  const palette = document.getElementById("tag-color-palette");
+  palette.innerHTML = "";
+  PALETTE.forEach(col => {
+    const sw = document.createElement("div");
+    sw.className = "tag-color-swatch" + (col === selectedColor ? " selected" : "");
+    sw.style.background = col;
+    sw.title = col;
+    sw.addEventListener("click", () => {
+      palette.querySelectorAll(".tag-color-swatch").forEach(s => s.classList.remove("selected"));
+      sw.classList.add("selected");
+      document.getElementById("tag-form-color").value = col;
+    });
+    palette.appendChild(sw);
+  });
+}
+
+function openTagForm(idx) {
+  const form = document.getElementById("admin-tag-form");
+  const title = document.getElementById("tag-form-title");
+  form.style.display = "";
+  if (idx === null) {
+    // New
+    title.textContent = "Add New Tag";
+    document.getElementById("tag-form-label").value = "";
+    document.getElementById("tag-form-color").value = PALETTE[0];
+    document.getElementById("tag-edit-idx").value   = "";
+    buildPalette(PALETTE[0]);
+  } else {
+    // Edit existing
+    const t = TAGS[idx];
+    title.textContent = "Edit Tag";
+    document.getElementById("tag-form-label").value = t.label;
+    document.getElementById("tag-form-color").value = t.color;
+    document.getElementById("tag-edit-idx").value   = idx;
+    buildPalette(t.color);
+  }
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+document.getElementById("add-tag-btn").addEventListener("click", () => openTagForm(null));
+
+document.getElementById("tag-form-cancel").addEventListener("click", () => {
+  document.getElementById("admin-tag-form").style.display = "none";
+});
+
+document.getElementById("tag-form-save").addEventListener("click", async () => {
+  const label = document.getElementById("tag-form-label").value.trim();
+  const color = document.getElementById("tag-form-color").value;
+  const idx   = document.getElementById("tag-edit-idx").value;
+  if (!label) { showToast("Please enter a tag label."); return; }
+
+  const newList = [...TAGS];
+  if (idx === "") {
+    // Add new — generate id from label
+    const id = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (newList.find(t => t.id === id)) { showToast("A tag with that name already exists."); return; }
+    newList.push({ id, label, color });
+  } else {
+    newList[parseInt(idx)] = { ...newList[parseInt(idx)], label, color };
+  }
+
+  try {
+    await saveTags(newList);
+    document.getElementById("admin-tag-form").style.display = "none";
+    renderTagsTab();
+    buildEditTagChips(); // refresh edit modal chips
+    showToast(idx === "" ? "Tag added!" : "Tag updated!");
+  } catch (e) { showToast("Error saving tags: " + e.message); }
+});
+
+async function deleteTag(idx) {
+  if (!confirm("Delete this tag? Posts using it will still have the old tag ID stored.")) return;
+  const newList = TAGS.filter((_, i) => i !== idx);
+  try {
+    await saveTags(newList);
+    renderTagsTab();
+    buildEditTagChips();
+    showToast("Tag deleted.");
+  } catch (e) { showToast("Error: " + e.message); }
+}
 </script>
 </body>
 </html>

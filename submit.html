@@ -141,25 +141,36 @@ document.addEventListener("click", e => {
     links.classList.remove("open");
 });
 
-// ── Build tag chips ──────────────────────────────────────────
+// ── Build tag chips (loads from Firestore) ────────────────────
 const chipGrid   = document.getElementById("tag-chip-grid");
 const tagInput   = document.getElementById("selected-tag");
 const tagError   = document.getElementById("tag-error");
 
-TAGS.forEach(t => {
-  const chip = document.createElement("button");
-  chip.type        = "button";
-  chip.className   = "tag-chip";
-  chip.dataset.tag = t.id;
-  chip.textContent = `${t.emoji} ${t.label}`;
-  chip.addEventListener("click", () => {
-    document.querySelectorAll(".tag-chip").forEach(c => c.classList.remove("selected"));
-    chip.classList.add("selected");
-    tagInput.value = t.id;
-    tagError.classList.remove("show");
+(async function() {
+  await loadTags();
+  TAGS.forEach(t => {
+    const chip = document.createElement("button");
+    chip.type        = "button";
+    chip.className   = "tag-chip";
+    chip.dataset.tag = t.id;
+    chip.textContent = t.label;
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".tag-chip").forEach(c => {
+        c.classList.remove("selected");
+        c.style.background  = "";
+        c.style.color       = "";
+        c.style.borderColor = "";
+      });
+      chip.classList.add("selected");
+      chip.style.background  = t.color;
+      chip.style.color       = "#fff";
+      chip.style.borderColor = t.color;
+      tagInput.value = t.id;
+      tagError.classList.remove("show");
+    });
+    chipGrid.appendChild(chip);
   });
-  chipGrid.appendChild(chip);
-});
+})();
 
 // ── Image previews ───────────────────────────────────────────
 const imgFile    = document.getElementById("img-file");

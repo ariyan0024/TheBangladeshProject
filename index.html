@@ -39,6 +39,9 @@
 
   <!-- ── Live Feed ─────────────────────────────────────────── -->
   <section id="feed">
+    <!-- Pull to refresh indicator -->
+    <div id="pull-indicator"><span class="pull-arrow">↓ Pull to refresh</span><div class="pull-spinner"></div></div>
+
     <div class="live-badge">
       <span class="live-dot"></span> Live &nbsp;
       <span id="live-count" style="font-size:.72rem;color:var(--subtle);font-weight:400"></span>
@@ -208,24 +211,28 @@ document.addEventListener("click", e => {
   }
 });
 
-// ── Tag filter bar ──────────────────────────────────────────
-const filterBar = document.getElementById("tag-filter-bar");
-TAGS.forEach(t => {
-  const btn = document.createElement("button");
-  btn.className    = "tag-filter-btn";
-  btn.dataset.tag  = t.id;
-  btn.textContent  = `${t.emoji} ${t.label}`;
-  filterBar.appendChild(btn);
-});
-filterBar.addEventListener("click", e => {
-  const btn = e.target.closest(".tag-filter-btn");
-  if (!btn) return;
-  document.querySelectorAll(".tag-filter-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  switchFeed(btn.dataset.tag);
-});
-
-// ── Feed subscription ───────────────────────────────────────
+// ── Init: load tags then build filter bar and feed ──────────
+(async function() {
+  await loadTags();
+  const filterBar = document.getElementById("tag-filter-bar");
+  TAGS.forEach(t => {
+    const btn = document.createElement("button");
+    btn.className    = "tag-filter-btn";
+    btn.dataset.tag  = t.id;
+    btn.textContent  = t.label;
+    btn.style.color  = t.color;
+    filterBar.appendChild(btn);
+  });
+  filterBar.addEventListener("click", e => {
+    const btn = e.target.closest(".tag-filter-btn");
+    if (!btn) return;
+    document.querySelectorAll(".tag-filter-btn").forEach(b => { b.classList.remove("active"); b.style.color = b.dataset.tag === "all" ? "" : getTagInfo(b.dataset.tag).color; });
+    btn.classList.add("active");
+    btn.style.color = "";
+    switchFeed(btn.dataset.tag);
+  });
+  switchFeed("all");
+})();
 let currentPostId  = null;
 let postsCache     = {};
 let feedUnsub      = null;
@@ -274,9 +281,13 @@ const reportBtn = document.getElementById("report-btn");
 function openModal(id, data) {
   currentPostId = id;
 
-  // Name + time
+  // Name + time + views
   document.getElementById("modal-name").textContent = data.name;
-  document.getElementById("modal-time").textContent = formatTime(data.timestamp);
+  const viewsStr = (data.views && data.views > 0) ? ` · ${Number(data.views).toLocaleString()} view${data.views === 1 ? "" : "s"}` : "";
+  document.getElementById("modal-time").textContent = formatTime(data.timestamp) + viewsStr;
+
+  // Increment view count
+  incrementViews(id);
 
   // Profile link
   const profileLinkEl   = document.getElementById("modal-profilelink");
@@ -295,7 +306,7 @@ function openModal(id, data) {
   const tagWrap = document.getElementById("modal-tag-wrap");
   if (data.tag) {
     const t = getTagInfo(data.tag);
-    tagWrap.innerHTML = `<span class="tag-badge tag-${esc(t.id)}">${t.emoji} ${esc(t.label)}</span>`;
+    tagWrap.innerHTML = `<span class="tag-badge" style="color:${esc(t.color)};border-color:${esc(t.color)}">${esc(t.label)}</span>`;
   } else {
     tagWrap.innerHTML = `<span style="font-size:.8rem;color:var(--subtle)">Uncategorised</span>`;
   }
@@ -484,6 +495,45 @@ window.addEventListener("load", () => {
     }, 1500);
   }
 });
+
+// -- Pull to refresh -------------------------------------------
+(function() {
+  const indicator = document.getElementById("pull-indicator");
+  if (!indicator) return;
+  let startY = 0, pulling = false, triggered = false;
+  document.addEventListener("touchstart", e => {
+    if (window.scrollY === 0) { startY = e.touches[0].clientY; pulling = true; triggered = false; }
+  }, { passive: true });
+  document.addEventListener("touchmove", e => {
+    if (!pulling) return;
+    const dist = e.touches[0].clientY - startY;
+    if (dist <= 0 || window.scrollY > 0) { pulling = false; return; }
+    indicator.style.height  = Math.min(dist, 72) + "px";
+    indicator.style.opacity = Math.min(1, dist / 60);
+    const arrow = indicator.querySelector(".pull-arrow");
+    if (arrow) arrow.textContent = dist > 60 ? "? Release to refresh" : "? Pull to refresh";
+    triggered = dist > 60;
+  }, { passive: true });
+  document.addEventListener("touchend", () => {
+    if (!pulling) return;
+    pulling = false;
+    if (triggered) {
+      indicator.classList.add("refreshing");
+      indicator.style.height  = "48px";
+      indicator.style.opacity = "1";
+      const activeBtn = document.querySelector(".tag-filter-btn.active");
+      switchFeed(activeBtn ? activeBtn.dataset.tag : "all");
+      setTimeout(() => {
+        indicator.classList.remove("refreshing");
+        indicator.style.height  = "0";
+        indicator.style.opacity = "0";
+      }, 900);
+    } else {
+      indicator.style.height  = "0";
+      indicator.style.opacity = "0";
+    }
+  }, { passive: true });
+})();
 </script>
 </body>
 </html>

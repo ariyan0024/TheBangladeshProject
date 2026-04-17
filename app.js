@@ -2,16 +2,35 @@
 //  THE BANGLADESH PROJECT — app.js  (v3)
 // ============================================================
 
-// ── Tags ─────────────────────────────────────────────────────
-const TAGS = [
-  { id: "harassment",     label: "Harassment",            emoji: "😡" },
-  { id: "scam",           label: "Scam / Fraud",          emoji: "💰" },
-  { id: "misinformation", label: "Misinformation",        emoji: "❌" },
-  { id: "inappropriate",  label: "Inappropriate Content", emoji: "⚠️" },
-  { id: "threats",        label: "Threats",               emoji: "🔴" },
-  { id: "privacy",        label: "Privacy Violation",     emoji: "🔒" },
-  { id: "other",          label: "Other",                 emoji: "📋" },
+// ── Tags (defaults — overridable from Firestore) ──────────────
+let TAGS = [
+  { id: "harassment",     label: "Harassment",            color: "#c53030" },
+  { id: "scam",           label: "Scam / Fraud",          color: "#b7791f" },
+  { id: "misinformation", label: "Misinformation",        color: "#2b6cb0" },
+  { id: "inappropriate",  label: "Inappropriate Content", color: "#c05621" },
+  { id: "threats",        label: "Threats",               color: "#9b2c2c" },
+  { id: "privacy",        label: "Privacy Violation",     color: "#276749" },
+  { id: "other",          label: "Other",                 color: "#4a5568" },
 ];
+
+/** Load tags from Firestore (if admin has customised them), else use defaults. */
+async function loadTags() {
+  try {
+    const doc = await db.collection("settings").doc("tags").get();
+    if (doc.exists && Array.isArray(doc.data().list) && doc.data().list.length > 0) {
+      TAGS = doc.data().list;
+    }
+  } catch (e) {
+    console.warn("Could not load tags from Firestore, using defaults:", e);
+  }
+  return TAGS;
+}
+
+/** Save the full tags list to Firestore. */
+async function saveTags(list) {
+  TAGS = list;
+  return db.collection("settings").doc("tags").set({ list });
+}
 
 // ── Dark mode (runs immediately to prevent flash) ─────────────
 function applyTheme() {
@@ -66,7 +85,8 @@ async function addPost({ name, image, comment, commentImage = "", postLink = "",
     status:       "pending",
     timestamp:    firebase.firestore.FieldValue.serverTimestamp(),
     reports:      0,
-    commentCount: 0
+    commentCount: 0,
+    views:        0
   });
 }
 
@@ -262,7 +282,13 @@ function esc(str) {
 }
 
 function getTagInfo(tagId) {
-  return TAGS.find(t => t.id === tagId) || { id: tagId, label: tagId, emoji: "📌" };
+  return TAGS.find(t => t.id === tagId) || { id: tagId, label: tagId, color: "#4a5568" };
+}
+
+/** Increment a post's view count in Firestore */
+function incrementViews(id) {
+  postsCol.doc(id).update({ views: firebase.firestore.FieldValue.increment(1) })
+    .catch(() => {/* silently ignore */});
 }
 
 /** Build a feed post card element */
@@ -274,11 +300,11 @@ function buildCard(id, data) {
   const avatarHtml = data.image
     ? `<img class="card-avatar" src="${esc(data.image)}" alt="${esc(data.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
     : "";
-  const placeholderHtml = `<div class="card-avatar-placeholder" style="${data.image ? "display:none" : ""}">${esc(getInitial(data.name))}</div>`;
+  const placeholderHtml = `<div class="card-avatar-placeholder" style="${data.image ? "display:none" : ""}}">${esc(getInitial(data.name))}</div>`;
 
   const tagInfo = data.tag ? getTagInfo(data.tag) : null;
   const tagHtml = tagInfo
-    ? `<span class="tag-badge tag-${esc(tagInfo.id)}">${tagInfo.emoji} ${esc(tagInfo.label)}</span>`
+    ? `<span class="tag-badge" style="color:${esc(tagInfo.color)};border-color:${esc(tagInfo.color)}">${esc(tagInfo.label)}</span>`
     : "";
 
   const commentImgHtml = data.commentImage
@@ -289,13 +315,17 @@ function buildCard(id, data) {
     ? `<a class="card-post-link" href="${esc(data.postLink)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">🔗 ${esc(data.postLink)}</a>`
     : "";
 
+  const viewsHtml = (data.views && data.views > 0)
+    ? `<span class="card-views">${Number(data.views).toLocaleString()} view${data.views === 1 ? "" : "s"}</span>`
+    : "";
+
   card.innerHTML = `
     <div class="card-header">
       ${avatarHtml}
       ${placeholderHtml}
       <div class="card-meta">
         <div class="card-name">${esc(data.name)}</div>
-        <div class="card-time">${formatTime(data.timestamp)}</div>
+        <div class="card-time">${formatTime(data.timestamp)} ${viewsHtml}</div>
       </div>
       ${tagHtml}
     </div>
