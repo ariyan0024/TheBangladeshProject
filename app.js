@@ -26,7 +26,7 @@ const postsCol = db.collection("posts");
 // ── Firestore Helpers ────────────────────────────────────────
 
 /** Add a new post (pending by default) */
-async function addPost({ name, image, comment, commentImage = "", postLink = "" }) {
+async function addPost({ name, image, comment, commentImage = "", postLink = "", profileLink = "" }) {
   return postsCol.add({
     name: name.trim(),
     nameLower: name.trim().toLowerCase(),
@@ -34,6 +34,7 @@ async function addPost({ name, image, comment, commentImage = "", postLink = "" 
     comment: comment.trim(),
     commentImage: commentImage.trim(),
     postLink: postLink.trim(),
+    profileLink: profileLink.trim(),
     status: "pending",
     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
     reports: 0

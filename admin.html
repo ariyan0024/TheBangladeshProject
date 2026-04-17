@@ -119,6 +119,10 @@
           <label for="edit-post-link">Post Link</label>
           <input type="url" id="edit-post-link" class="form-control" />
         </div>
+        <div class="form-group">
+          <label for="edit-profile-link">Profile Link</label>
+          <input type="url" id="edit-profile-link" class="form-control" />
+        </div>
         <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Save Changes</button>
       </form>
     </div>
@@ -223,6 +227,10 @@ function buildAdminCard(id, data, type) {
     ? `<img class="admin-card-image" src="${esc(data.commentImage)}" alt="" onerror="this.remove()" />`
     : "";
 
+  const profileLinkHtml = data.profileLink
+    ? `<a href="${esc(data.profileLink)}" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:4px;display:inline-block">👤 ${esc(data.profileLink)}</a>`
+    : "";
+
   const postLinkHtml = data.postLink
     ? `<a href="${esc(data.postLink)}" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:6px;display:inline-block">🔗 ${esc(data.postLink)}</a>`
     : "";
@@ -239,6 +247,7 @@ function buildAdminCard(id, data, type) {
     <div class="admin-card-body">
       <div class="admin-card-name">${esc(data.name)}</div>
       <div class="admin-card-meta">${formatTime(data.timestamp)}${data.reports ? ` · ⚑ ${data.reports} report(s)` : ""}</div>
+      ${profileLinkHtml}
       <div class="admin-card-comment">${esc(data.comment)}</div>
       ${commentImgHtml}
       ${postLinkHtml}
@@ -288,6 +297,7 @@ function openEditModal(id, data) {
   document.getElementById("edit-image").value          = data.image        || "";
   document.getElementById("edit-comment-image").value  = data.commentImage || "";
   document.getElementById("edit-post-link").value      = data.postLink     || "";
+  document.getElementById("edit-profile-link").value   = data.profileLink  || "";
   editOverlay.classList.add("open");
   document.body.style.overflow = "hidden";
 }
@@ -306,9 +316,10 @@ editForm.addEventListener("submit", async e => {
   const image        = document.getElementById("edit-image").value.trim();
   const commentImage = document.getElementById("edit-comment-image").value.trim();
   const postLink     = document.getElementById("edit-post-link").value.trim();
+  const profileLink  = document.getElementById("edit-profile-link").value.trim();
   if (!name || !comment) { showToast("Name and comment are required."); return; }
   try {
-    await updatePost(id, { name, nameLower: name.toLowerCase(), comment, image, commentImage, postLink });
+    await updatePost(id, { name, nameLower: name.toLowerCase(), comment, image, commentImage, postLink, profileLink });
     closeEditModal(); showToast("Post updated.");
   } catch (err) { showToast("Error: " + err.message); }
 });

@@ -53,6 +53,20 @@
         />
       </div>
 
+      <!-- Culprit Profile Link -->
+      <div class="form-group">
+        <label for="profile-link">Culprit Profile Link <span style="font-size:.75rem;color:#cc0000">* required</span></label>
+        <input
+          type="url"
+          id="profile-link"
+          name="profileLink"
+          class="form-control"
+          placeholder="https://facebook.com/username"
+          required
+        />
+        <p class="hint">Link to the culprit's social media profile or page.</p>
+      </div>
+
       <!-- Culprit Image -->
       <div class="form-group">
         <label>Profile / Culprit Image <span class="form-optional">(optional)</span></label>
@@ -170,12 +184,14 @@ form.addEventListener("submit", async e => {
   successMsg.classList.remove("show");
   errorMsg.classList.remove("show");
 
-  const name    = document.getElementById("name").value.trim();
-  const comment = document.getElementById("comment").value.trim();
-  const postLink = document.getElementById("post-link").value.trim();
+  const name        = document.getElementById("name").value.trim();
+  const comment     = document.getElementById("comment").value.trim();
+  const postLink    = document.getElementById("post-link").value.trim();
+  const profileLink = document.getElementById("profile-link").value.trim();
 
-  if (!name)    { showErr("Please enter a name."); document.getElementById("name").focus(); return; }
-  if (!comment) { showErr("Please enter a comment."); document.getElementById("comment").focus(); return; }
+  if (!name)        { showErr("Please enter a name."); document.getElementById("name").focus(); return; }
+  if (!profileLink) { showErr("Please enter the culprit's profile link. This is required."); document.getElementById("profile-link").focus(); return; }
+  if (!comment)     { showErr("Please enter a comment."); document.getElementById("comment").focus(); return; }
 
   // Resolve images (file upload only)
   let image = imgFile.files[0] ? await fileToBase64(imgFile.files[0]) : "";
@@ -192,7 +208,7 @@ form.addEventListener("submit", async e => {
   submitBtn.textContent = "Submitting…";
 
   try {
-    await addPost({ name, image, comment, commentImage, postLink });
+    await addPost({ name, image, comment, commentImage, postLink, profileLink });
     form.reset();
     imgPreview.style.display = "none";
     commentImgPreview.style.display = "none";

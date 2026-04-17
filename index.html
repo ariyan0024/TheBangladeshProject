@@ -98,6 +98,13 @@
         <div class="field-label">Name</div>
         <div id="modal-name" style="font-size:1.2rem;font-weight:700"></div>
 
+        <!-- Profile Link -->
+        <div class="field-label">Profile Link</div>
+        <div id="modal-profilelink-wrap">
+          <a id="modal-profilelink" href="#" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:0"></a>
+          <div id="modal-profilelink-none" style="font-size:.8rem;color:var(--subtle);display:none">No link provided</div>
+        </div>
+
         <!-- Culprit Image -->
         <div class="field-label">Culprit Image</div>
         <div class="modal-avatar-wrap" id="modal-avatar-wrap" style="display:none">
@@ -205,6 +212,19 @@
       // Name + time
       document.getElementById("modal-name").textContent = data.name;
       document.getElementById("modal-time").textContent = formatTime(data.timestamp);
+
+      // Profile link
+      const profileLinkEl   = document.getElementById("modal-profilelink");
+      const profileLinkNone = document.getElementById("modal-profilelink-none");
+      if (data.profileLink) {
+        profileLinkEl.href        = data.profileLink;
+        profileLinkEl.textContent = "👤 " + data.profileLink;
+        profileLinkEl.style.display  = "inline-flex";
+        profileLinkNone.style.display = "none";
+      } else {
+        profileLinkEl.style.display  = "none";
+        profileLinkNone.style.display = "block";
+      }
 
       // Culprit image
       const avatarWrap = document.getElementById("modal-avatar-wrap");
