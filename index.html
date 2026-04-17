@@ -1,333 +1,489 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Bangladesh Project — Live Feed</title>
   <meta name="description" content="A public record. Browse the live feed or search the A–Z directory." />
   <link rel="stylesheet" href="style.css" />
+  <script>
+    // apply theme immediately to prevent flash
+    (function(){ document.documentElement.setAttribute("data-theme", localStorage.getItem("tbp-theme")||"light"); })();
+  </script>
 </head>
-
 <body>
 
-  <!-- ── Navigation ─────────────────────────────────────────── -->
-  <nav class="nav">
-    <div class="nav-inner">
-      <span class="nav-logo">The Bangladesh Project</span>
-      <ul class="nav-links">
-        <li><a href="index.html" class="active">Feed</a></li>
-        <li><a href="directory.html">Directory</a></li>
-        <li><a href="submit.html">Submit</a></li>
-        <li><button class="nav-admin-btn" onclick="window.location.href='admin.html'">Admin</button></li>
-      </ul>
+<!-- ── Navigation ─────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="nav-logo">The Bangladesh Project</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">🌙</button>
+      <button class="nav-hamburger" id="hamburger" aria-label="Menu" onclick="toggleNav()">☰</button>
     </div>
-  </nav>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="index.html" class="active">Feed</a></li>
+      <li><a href="directory.html">Directory</a></li>
+      <li><a href="submit.html">Submit</a></li>
+      <li><button class="nav-admin-btn" onclick="window.location.href='admin.html'">Admin</button></li>
+    </ul>
+  </div>
+</nav>
 
-  <!-- ── Page Header ─────────────────────────────────────────── -->
-  <div class="container">
-    <div class="page-header">
-      <h1>Public Record</h1>
-      <p>A live, community-maintained archive. Newest entries appear first.</p>
-    </div>
-
-    <!-- ── Live Feed ─────────────────────────────────────────── -->
-    <section id="feed">
-      <div class="live-badge"><span class="live-dot"></span> Live &nbsp;<span id="live-count" style="font-size:.72rem;color:var(--subtle);font-weight:400"></span></div>
-      <p class="section-title">Latest Entries</p>
-      <div id="feed-list">
-        <div class="loader">
-          <div class="spinner"></div>
-        </div>
-      </div>
-    </section>
+<!-- ── Page Header ─────────────────────────────────────────── -->
+<div class="container">
+  <div class="page-header">
+    <h1>Public Record</h1>
+    <p>A live, community-maintained archive. Newest entries appear first.</p>
   </div>
 
-  <!-- ── Footer ────────────────────────────────────────────────── -->
-  <footer>
-    <div class="container" style="text-align:center">
-      <div>© The Bangladesh Project &mdash; <a href="submit.html">Submit an entry</a></div>
-      <div style="margin-top:6px">
-        <button id="about-btn" style="background:none;border:none;font-family:inherit;font-size:inherit;color:var(--subtle);cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px">About the Project</button>
-      </div>
+  <!-- ── Live Feed ─────────────────────────────────────────── -->
+  <section id="feed">
+    <div class="live-badge">
+      <span class="live-dot"></span> Live &nbsp;
+      <span id="live-count" style="font-size:.72rem;color:var(--subtle);font-weight:400"></span>
     </div>
 
-  </footer>
+    <!-- Tag filter bar -->
+    <div class="tag-filter-bar" id="tag-filter-bar">
+      <button class="tag-filter-btn active" data-tag="all">All</button>
+    </div>
 
-  <!-- ── About Modal ────────────────────────────────────────── -->
-  <div class="modal-overlay" id="about-overlay">
-    <div class="modal" style="max-width:480px">
-      <div class="modal-header">
-        <div style="font-weight:700;font-size:1rem">About the Project</div>
-        <button class="modal-close" id="about-close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <!-- ✏️ Edit your about text below -->
-        <p style="font-size:.9rem;line-height:1.8;color:#333">
-          The Bangladesh Project is a platform that documents and organizes publicly available online content, focusing
-          on harmful or inappropriate behavior such as abusive comments, harassment, and misleading information.
+    <p class="section-title">Latest Entries</p>
+    <div id="feed-list">
+      <div class="loader"><div class="spinner"></div></div>
+    </div>
+  </section>
+</div>
 
-          The purpose of the project is to keep a record of such activity in one place, making it easier to observe
-          patterns and understand how this type of behavior appears and spreads online.
-
-          Submissions are open, but all entries are reviewed before being added. Each entry represents a documented
-          instance involving a specific individual and their public content.
-
-          The project aims to create a structured archive of online behavior without unnecessary noise, keeping the
-          focus on clarity and documentation.
-        </p>
-      </div>
+<!-- ── Footer ────────────────────────────────────────────────── -->
+<footer>
+  <div class="container" style="text-align:center">
+    <div>© The Bangladesh Project &mdash; <a href="submit.html">Submit an entry</a></div>
+    <div style="margin-top:6px">
+      <button id="about-btn" style="background:none;border:none;font-family:inherit;font-size:inherit;color:var(--subtle);cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px">About the Project</button>
     </div>
   </div>
+</footer>
 
-
-  <!-- ── Post Detail Modal ─────────────────────────────────── -->
-  <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
-    <div class="modal" id="modal">
-      <div class="modal-header">
-        <div style="display:flex;align-items:baseline;gap:10px">
-          <span
-            style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--subtle)">Entry</span>
-          <span id="modal-time" style="font-size:.72rem;color:var(--subtle)"></span>
-        </div>
-        <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-body">
-
-        <!-- Name -->
-        <div class="field-label">Name</div>
-        <div id="modal-name" style="font-size:1.2rem;font-weight:700"></div>
-
-        <!-- Profile Link -->
-        <div class="field-label">Profile Link</div>
-        <div id="modal-profilelink-wrap">
-          <a id="modal-profilelink" href="#" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:0"></a>
-          <div id="modal-profilelink-none" style="font-size:.8rem;color:var(--subtle);display:none">No link provided</div>
-        </div>
-
-        <!-- Culprit Image -->
-        <div class="field-label">Culprit Image</div>
-        <div class="modal-avatar-wrap" id="modal-avatar-wrap" style="display:none">
-          <img class="modal-avatar" id="modal-avatar" src="" alt="" style="margin-bottom:0;cursor:zoom-in" />
-        </div>
-        <div id="modal-avatar-none" style="font-size:.8rem;color:var(--subtle);display:none">No image provided</div>
-
-        <!-- Comment -->
-        <div class="field-label">Comment</div>
-        <div class="modal-comment" id="modal-comment"></div>
-
-        <!-- Comment Screenshot -->
-        <div class="field-label">Comment Screenshot</div>
-        <div id="modal-img-wrap">
-          <img class="modal-image" id="modal-img" src="" alt="comment screenshot" style="display:none;cursor:zoom-in" />
-          <div id="modal-img-none" style="font-size:.8rem;color:var(--subtle);display:none">No screenshot provided</div>
-        </div>
-
-        <!-- Post Link -->
-        <div class="field-label">Post Link</div>
-        <div id="modal-postlink-wrap">
-          <a id="modal-postlink" href="#" target="_blank" rel="noopener noreferrer" class="card-post-link"
-            style="margin-top:0"></a>
-          <div id="modal-postlink-none" style="font-size:.8rem;color:var(--subtle);display:none">No link provided</div>
-        </div>
-
-        <!-- Actions -->
-        <div class="modal-actions" style="margin-top:20px">
-          <button class="btn btn-outline btn-sm" id="copy-link-btn">🔗 Copy Link</button>
-          <button class="btn btn-ghost btn-sm" id="report-btn">⚑ Report</button>
-        </div>
-      </div>
+<!-- ── About Modal ────────────────────────────────────────── -->
+<div class="modal-overlay" id="about-overlay">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div style="font-weight:700;font-size:1rem">About the Project</div>
+      <button class="modal-close" id="about-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.9rem;line-height:1.8;color:#333">
+        The Bangladesh Project is a platform that documents and organizes publicly available online content, focusing
+        on harmful or inappropriate behavior such as abusive comments, harassment, and misleading information.
+        The purpose of the project is to keep a record of such activity in one place, making it easier to observe
+        patterns and understand how this type of behavior appears and spreads online.
+        Submissions are open, but all entries are reviewed before being added. Each entry represents a documented
+        instance involving a specific individual and their public content.
+        The project aims to create a structured archive of online behavior without unnecessary noise, keeping the
+        focus on clarity and documentation.
+      </p>
     </div>
   </div>
+</div>
 
-  <!-- ── Image Zoom Overlay ─────────────────────────────────── -->
-  <div class="img-zoom-overlay" id="zoom-overlay">
-    <img id="zoom-img" src="" alt="full size" />
+<!-- ── Post Detail Modal ─────────────────────────────────── -->
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--subtle)">Entry</span>
+        <span id="modal-time" style="font-size:.72rem;color:var(--subtle)"></span>
+      </div>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Name -->
+      <div class="field-label">Name</div>
+      <div id="modal-name" style="font-size:1.2rem;font-weight:700"></div>
+
+      <!-- Profile Link -->
+      <div class="field-label">Profile Link</div>
+      <div id="modal-profilelink-wrap">
+        <a id="modal-profilelink" href="#" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:0"></a>
+        <div id="modal-profilelink-none" style="font-size:.8rem;color:var(--subtle);display:none">No link provided</div>
+      </div>
+
+      <!-- Tag -->
+      <div class="field-label">Category</div>
+      <div id="modal-tag-wrap" style="margin-bottom:2px"></div>
+
+      <!-- Culprit Image -->
+      <div class="field-label">Culprit Image</div>
+      <div class="modal-avatar-wrap" id="modal-avatar-wrap" style="display:none">
+        <img class="modal-avatar" id="modal-avatar" src="" alt="" style="margin-bottom:0;cursor:zoom-in" />
+      </div>
+      <div id="modal-avatar-none" style="font-size:.8rem;color:var(--subtle);display:none">No image provided</div>
+
+      <!-- Comment -->
+      <div class="field-label">Comment</div>
+      <div class="modal-comment" id="modal-comment"></div>
+
+      <!-- Comment Screenshot -->
+      <div class="field-label">Comment Screenshot</div>
+      <div id="modal-img-wrap">
+        <img class="modal-image" id="modal-img" src="" alt="comment screenshot" style="display:none;cursor:zoom-in" />
+        <div id="modal-img-none" style="font-size:.8rem;color:var(--subtle);display:none">No screenshot provided</div>
+      </div>
+
+      <!-- Post Link -->
+      <div class="field-label">Post Link</div>
+      <div id="modal-postlink-wrap">
+        <a id="modal-postlink" href="#" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:0"></a>
+        <div id="modal-postlink-none" style="font-size:.8rem;color:var(--subtle);display:none">No link provided</div>
+      </div>
+
+      <!-- Actions -->
+      <div class="modal-actions" style="margin-top:20px">
+        <button class="btn btn-outline btn-sm" id="copy-link-btn">🔗 Copy Link</button>
+        <button class="btn btn-ghost btn-sm" id="report-btn">⚑ Report</button>
+      </div>
+
+      <!-- Comments Section -->
+      <div class="comments-section" id="comments-section">
+        <div class="comments-header">Comments</div>
+        <div id="comments-list"><div class="comments-loader"><div class="spinner" style="width:20px;height:20px;border-width:2px"></div></div></div>
+
+        <!-- Auth / input -->
+        <div class="comment-input-section">
+          <!-- Not signed in -->
+          <div class="comment-auth-prompt" id="comment-auth-prompt">
+            <span>Sign in with Google to leave a comment</span>
+            <button class="btn btn-outline btn-sm" id="google-signin-btn">Sign in with Google</button>
+          </div>
+          <!-- Signed in -->
+          <div id="comment-form-wrap" style="display:none">
+            <div class="comment-user-row">
+              <img id="comment-user-photo" src="" alt="" class="comment-avatar" style="width:32px;height:32px" onerror="this.style.display='none'" />
+              <div class="comment-textarea-wrap">
+                <textarea id="comment-input" placeholder="Add a comment…" maxlength="1000"></textarea>
+                <div class="comment-actions-row">
+                  <span class="comment-signed-as" id="comment-user-name"></span>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-ghost btn-sm" id="sign-out-comment-btn">Sign out</button>
+                    <button class="btn btn-primary btn-sm" id="post-comment-btn">Post</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </div>
+</div>
 
-  <!-- ── Firebase ────────────────────────────────────────────── -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script src="app.js"></script>
+<!-- ── Image Zoom Overlay ─────────────────────────────────── -->
+<div class="img-zoom-overlay" id="zoom-overlay">
+  <img id="zoom-img" src="" alt="full size" />
+</div>
 
-  <script>
-    // ── State ───────────────────────────────────────────────────
-    let currentPostId = null;
-    let postsCache = {};
+<!-- ── Firebase ────────────────────────────────────────────── -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="app.js"></script>
 
-    // ── Feed ────────────────────────────────────────────────────
-    const feedList = document.getElementById("feed-list");
+<script>
+// ── Theme init ──────────────────────────────────────────────
+applyTheme();
 
-    subscribeApprovedFeed(snapshot => {
-      feedList.innerHTML = "";
-      // Update live count
-      const countEl = document.getElementById("live-count");
-      if (countEl) countEl.textContent = snapshot.empty ? "" : `· ${snapshot.size} submission${snapshot.size === 1 ? "" : "s"}`;
+// ── Nav hamburger ───────────────────────────────────────────
+function toggleNav() {
+  document.getElementById("nav-links").classList.toggle("open");
+}
+document.addEventListener("click", e => {
+  const links  = document.getElementById("nav-links");
+  const burger = document.getElementById("hamburger");
+  if (links.classList.contains("open") && !links.contains(e.target) && e.target !== burger) {
+    links.classList.remove("open");
+  }
+});
 
-      if (snapshot.empty) {
-        feedList.innerHTML = '<p class="feed-empty">No entries yet. Be the first to <a href="submit.html">submit</a>.</p>';
-        return;
-      }
-      snapshot.forEach(doc => {
-        postsCache[doc.id] = doc.data();
-        const card = buildCard(doc.id, doc.data());
-        card.addEventListener("click", () => {
-          // Only count once per device per post
-          const viewed = JSON.parse(localStorage.getItem("viewed_posts") || "[]");
-          if (!viewed.includes(doc.id)) {
-            incrementViews(doc.id).catch(() => {});
-            viewed.push(doc.id);
-            localStorage.setItem("viewed_posts", JSON.stringify(viewed));
-          }
-          openModal(doc.id, doc.data());
-        });
-        feedList.appendChild(card);
-      });
+// ── Tag filter bar ──────────────────────────────────────────
+const filterBar = document.getElementById("tag-filter-bar");
+TAGS.forEach(t => {
+  const btn = document.createElement("button");
+  btn.className    = "tag-filter-btn";
+  btn.dataset.tag  = t.id;
+  btn.textContent  = `${t.emoji} ${t.label}`;
+  filterBar.appendChild(btn);
+});
+filterBar.addEventListener("click", e => {
+  const btn = e.target.closest(".tag-filter-btn");
+  if (!btn) return;
+  document.querySelectorAll(".tag-filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  switchFeed(btn.dataset.tag);
+});
 
-    });
+// ── Feed subscription ───────────────────────────────────────
+let currentPostId  = null;
+let postsCache     = {};
+let feedUnsub      = null;
+let commentsUnsub  = null;
 
-    // ── Image Zoom ──────────────────────────────────────────────
-    const zoomOverlay = document.getElementById("zoom-overlay");
-    const zoomImg = document.getElementById("zoom-img");
+const feedList = document.getElementById("feed-list");
 
-    function openZoom(src) {
-      zoomImg.src = src;
-      zoomOverlay.classList.add("open");
+function switchFeed(tag) {
+  if (feedUnsub) feedUnsub();
+  feedList.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  const handler = snapshot => {
+    feedList.innerHTML = "";
+    const countEl = document.getElementById("live-count");
+    if (countEl) countEl.textContent = snapshot.empty ? "" : `· ${snapshot.size} submission${snapshot.size === 1 ? "" : "s"}`;
+    if (snapshot.empty) {
+      feedList.innerHTML = '<p class="feed-empty">No entries found.</p>';
+      return;
     }
-    function closeZoom() { zoomOverlay.classList.remove("open"); }
+    snapshot.forEach(doc => {
+      postsCache[doc.id] = doc.data();
+      const card = buildCard(doc.id, doc.data());
+      card.addEventListener("click", () => openModal(doc.id, doc.data()));
+      feedList.appendChild(card);
+    });
+  };
+  feedUnsub = (tag === "all")
+    ? subscribeApprovedFeed(handler)
+    : subscribeApprovedByTag(tag, handler);
+}
+switchFeed("all");
 
-    zoomOverlay.addEventListener("click", closeZoom);
-    document.addEventListener("keydown", e => { if (e.key === "Escape") { closeZoom(); closeModal(); } });
+// ── Image Zoom ──────────────────────────────────────────────
+const zoomOverlay = document.getElementById("zoom-overlay");
+const zoomImg     = document.getElementById("zoom-img");
+function openZoom(src) { zoomImg.src = src; zoomOverlay.classList.add("open"); }
+function closeZoom()   { zoomOverlay.classList.remove("open"); }
+zoomOverlay.addEventListener("click", closeZoom);
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeZoom(); closeModal(); closeAbout(); } });
 
-    // ── Modal ───────────────────────────────────────────────────
-    const overlay = document.getElementById("modal-overlay");
-    const closeBtn = document.getElementById("modal-close");
-    const copyBtn = document.getElementById("copy-link-btn");
-    const reportBtn = document.getElementById("report-btn");
+// ── Modal ───────────────────────────────────────────────────
+const overlay   = document.getElementById("modal-overlay");
+const closeBtn  = document.getElementById("modal-close");
+const copyBtn   = document.getElementById("copy-link-btn");
+const reportBtn = document.getElementById("report-btn");
 
-    function openModal(id, data) {
-      currentPostId = id;
+function openModal(id, data) {
+  currentPostId = id;
 
-      // Name + time
-      document.getElementById("modal-name").textContent = data.name;
-      document.getElementById("modal-time").textContent = formatTime(data.timestamp);
+  // Name + time
+  document.getElementById("modal-name").textContent = data.name;
+  document.getElementById("modal-time").textContent = formatTime(data.timestamp);
 
-      // Profile link
-      const profileLinkEl   = document.getElementById("modal-profilelink");
-      const profileLinkNone = document.getElementById("modal-profilelink-none");
-      if (data.profileLink) {
-        profileLinkEl.href        = data.profileLink;
-        profileLinkEl.textContent = "👤 " + data.profileLink;
-        profileLinkEl.style.display  = "inline-flex";
-        profileLinkNone.style.display = "none";
-      } else {
-        profileLinkEl.style.display  = "none";
-        profileLinkNone.style.display = "block";
-      }
+  // Profile link
+  const profileLinkEl   = document.getElementById("modal-profilelink");
+  const profileLinkNone = document.getElementById("modal-profilelink-none");
+  if (data.profileLink) {
+    profileLinkEl.href = data.profileLink;
+    profileLinkEl.textContent = "👤 " + data.profileLink;
+    profileLinkEl.style.display = "inline-flex";
+    profileLinkNone.style.display = "none";
+  } else {
+    profileLinkEl.style.display = "none";
+    profileLinkNone.style.display = "block";
+  }
 
-      // Culprit image
-      const avatarWrap = document.getElementById("modal-avatar-wrap");
-      const avatarNone = document.getElementById("modal-avatar-none");
-      const avatar = document.getElementById("modal-avatar");
-      if (data.image) {
-        avatar.src = data.image;
-        avatar.onerror = () => { avatarWrap.style.display = "none"; avatarNone.style.display = "block"; };
-        avatarWrap.style.display = "inline-block";
-        avatarNone.style.display = "none";
-        // Zoom on click
-        avatar.onclick = (e) => { e.stopPropagation(); openZoom(data.image); };
-      } else {
-        avatarWrap.style.display = "none";
-        avatarNone.style.display = "block";
-      }
+  // Tag
+  const tagWrap = document.getElementById("modal-tag-wrap");
+  if (data.tag) {
+    const t = getTagInfo(data.tag);
+    tagWrap.innerHTML = `<span class="tag-badge tag-${esc(t.id)}">${t.emoji} ${esc(t.label)}</span>`;
+  } else {
+    tagWrap.innerHTML = `<span style="font-size:.8rem;color:var(--subtle)">Uncategorised</span>`;
+  }
 
-      // Comment
-      document.getElementById("modal-comment").textContent = data.comment;
+  // Avatar
+  const avatarWrap = document.getElementById("modal-avatar-wrap");
+  const avatarNone = document.getElementById("modal-avatar-none");
+  const avatar     = document.getElementById("modal-avatar");
+  if (data.image) {
+    avatar.src = data.image;
+    avatar.onerror = () => { avatarWrap.style.display = "none"; avatarNone.style.display = "block"; };
+    avatarWrap.style.display = "inline-block";
+    avatarNone.style.display = "none";
+    avatar.onclick = e => { e.stopPropagation(); openZoom(data.image); };
+  } else {
+    avatarWrap.style.display = "none";
+    avatarNone.style.display = "block";
+  }
 
-      // Comment screenshot
-      const imgEl = document.getElementById("modal-img");
-      const imgNone = document.getElementById("modal-img-none");
-      if (data.commentImage) {
-        imgEl.src = data.commentImage;
-        imgEl.style.display = "block";
-        imgNone.style.display = "none";
-        imgEl.onerror = () => { imgEl.style.display = "none"; imgNone.style.display = "block"; };
-        imgEl.onclick = (e) => { e.stopPropagation(); openZoom(data.commentImage); };
-      } else {
-        imgEl.style.display = "none";
-        imgNone.style.display = "block";
-      }
+  // Comment
+  document.getElementById("modal-comment").textContent = data.comment;
 
-      // Post link
-      const linkEl = document.getElementById("modal-postlink");
-      const linkNone = document.getElementById("modal-postlink-none");
-      if (data.postLink) {
-        linkEl.href = data.postLink;
-        linkEl.textContent = "🔗 " + data.postLink;
-        linkEl.style.display = "inline-flex";
-        linkNone.style.display = "none";
-      } else {
-        linkEl.style.display = "none";
-        linkNone.style.display = "block";
-      }
+  // Screenshot
+  const imgEl   = document.getElementById("modal-img");
+  const imgNone = document.getElementById("modal-img-none");
+  if (data.commentImage) {
+    imgEl.src = data.commentImage;
+    imgEl.style.display = "block";
+    imgNone.style.display = "none";
+    imgEl.onerror = () => { imgEl.style.display = "none"; imgNone.style.display = "block"; };
+    imgEl.onclick = e => { e.stopPropagation(); openZoom(data.commentImage); };
+  } else {
+    imgEl.style.display = "none";
+    imgNone.style.display = "block";
+  }
 
-      history.replaceState(null, "", `?post=${id}`);
-      overlay.classList.add("open");
-      document.body.style.overflow = "hidden";
+  // Post link
+  const linkEl   = document.getElementById("modal-postlink");
+  const linkNone = document.getElementById("modal-postlink-none");
+  if (data.postLink) {
+    linkEl.href = data.postLink;
+    linkEl.textContent = "🔗 " + data.postLink;
+    linkEl.style.display = "inline-flex";
+    linkNone.style.display = "none";
+  } else {
+    linkEl.style.display = "none";
+    linkNone.style.display = "block";
+  }
+
+  // Report button state
+  reportBtn.disabled   = false;
+  reportBtn.textContent = "⚑ Report";
+
+  // Load comments
+  loadComments(id);
+
+  history.replaceState(null, "", `?post=${id}`);
+  overlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeModal() {
+  overlay.classList.remove("open");
+  document.body.style.overflow = "";
+  history.replaceState(null, "", window.location.pathname);
+  if (commentsUnsub) { commentsUnsub(); commentsUnsub = null; }
+}
+
+closeBtn.addEventListener("click", closeModal);
+overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
+
+copyBtn.addEventListener("click", () => {
+  copyToClipboard(`${location.origin}${location.pathname}?post=${currentPostId}`);
+});
+
+reportBtn.addEventListener("click", async () => {
+  if (!currentPostId) return;
+  if (!currentUser) {
+    showToast("Sign in with Google to report a post.");
+    // scroll to sign-in section inside modal
+    document.getElementById("comment-auth-prompt").scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  try {
+    await reportPost(currentPostId);
+    showToast("Report submitted.");
+    reportBtn.disabled = true;
+    reportBtn.textContent = "✓ Reported";
+  } catch { showToast("Failed to report."); }
+});
+
+// ── Comments ────────────────────────────────────────────────
+let currentUser = null;
+auth.onAuthStateChanged(user => {
+  currentUser = user;
+  updateCommentUI();
+});
+
+function updateCommentUI() {
+  const prompt   = document.getElementById("comment-auth-prompt");
+  const formWrap = document.getElementById("comment-form-wrap");
+  if (!prompt || !formWrap) return;
+  if (currentUser) {
+    prompt.style.display   = "none";
+    formWrap.style.display = "block";
+    const photo = document.getElementById("comment-user-photo");
+    const name  = document.getElementById("comment-user-name");
+    if (photo) photo.src = currentUser.photoURL || "";
+    if (name)  name.textContent = currentUser.displayName || currentUser.email;
+  } else {
+    prompt.style.display   = "flex";
+    formWrap.style.display = "none";
+  }
+}
+
+document.getElementById("google-signin-btn").addEventListener("click", () => {
+  signInWithGoogle().catch(err => showToast("Sign-in failed: " + err.message));
+});
+
+document.getElementById("sign-out-comment-btn").addEventListener("click", () => {
+  signOut().then(() => showToast("Signed out."));
+});
+
+document.getElementById("post-comment-btn").addEventListener("click", async () => {
+  const input = document.getElementById("comment-input");
+  const text  = input.value.trim();
+  if (!text) { showToast("Please write something first."); return; }
+  if (!currentPostId) return;
+  try {
+    await addComment(currentPostId, text);
+    input.value = "";
+    showToast("Comment posted!");
+  } catch (err) { showToast("Failed: " + err.message); }
+});
+
+function loadComments(postId) {
+  const list = document.getElementById("comments-list");
+  list.innerHTML = '<div class="comments-loader"><div class="spinner" style="width:20px;height:20px;border-width:2px"></div></div>';
+  if (commentsUnsub) commentsUnsub();
+  commentsUnsub = subscribeComments(postId, snapshot => {
+    list.innerHTML = "";
+    if (snapshot.empty) {
+      list.innerHTML = '<p class="comment-empty">No comments yet. Be the first!</p>';
+      return;
     }
-
-    function closeModal() {
-      overlay.classList.remove("open");
-      document.body.style.overflow = "";
-      history.replaceState(null, "", window.location.pathname);
-    }
-
-    closeBtn.addEventListener("click", closeModal);
-    overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
-
-    copyBtn.addEventListener("click", () => {
-      copyToClipboard(`${location.origin}${location.pathname}?post=${currentPostId}`);
+    snapshot.forEach(doc => {
+      const c  = doc.data();
+      const el = document.createElement("div");
+      el.className = "comment-item";
+      const avatarHtml = c.authorPhoto
+        ? `<img class="comment-avatar" src="${esc(c.authorPhoto)}" alt="" onerror="this.style.display='none'" />`
+        : `<div class="comment-avatar-placeholder">${esc(getInitial(c.authorName))}</div>`;
+      el.innerHTML = `
+        ${avatarHtml}
+        <div class="comment-body">
+          <div class="comment-meta">
+            <span class="comment-author">${esc(c.authorName)}</span>
+            <span class="comment-time">${formatTime(c.timestamp)}</span>
+          </div>
+          <div class="comment-text">${esc(c.text)}</div>
+        </div>
+      `;
+      list.appendChild(el);
     });
+  });
+}
 
-    reportBtn.addEventListener("click", async () => {
-      if (!currentPostId) return;
-      try {
-        await reportPost(currentPostId);
-        showToast("Report submitted. Thank you.");
-        reportBtn.disabled = true;
-        reportBtn.textContent = "✓ Reported";
-      } catch { showToast("Failed to report."); }
-    });
+// ── About Modal ──────────────────────────────────────────────
+const aboutOverlay = document.getElementById("about-overlay");
+const aboutClose   = document.getElementById("about-close");
+function closeAbout() { aboutOverlay.classList.remove("open"); document.body.style.overflow = ""; }
+document.getElementById("about-btn").addEventListener("click", () => {
+  aboutOverlay.classList.add("open"); document.body.style.overflow = "hidden";
+});
+aboutClose.addEventListener("click", closeAbout);
+aboutOverlay.addEventListener("click", e => { if (e.target === aboutOverlay) closeAbout(); });
 
-    // ── About Modal ──────────────────────────────────────────────
-    const aboutOverlay = document.getElementById("about-overlay");
-    const aboutClose = document.getElementById("about-close");
-    document.getElementById("about-btn").addEventListener("click", () => {
-      aboutOverlay.classList.add("open");
-      document.body.style.overflow = "hidden";
-    });
-    aboutClose.addEventListener("click", () => {
-      aboutOverlay.classList.remove("open");
-      document.body.style.overflow = "";
-    });
-    aboutOverlay.addEventListener("click", e => {
-      if (e.target === aboutOverlay) { aboutOverlay.classList.remove("open"); document.body.style.overflow = ""; }
-    });
-
-
-    // ── Deep link on load ────────────────────────────────────────
-    window.addEventListener("load", () => {
-      const postId = new URLSearchParams(location.search).get("post");
-      if (postId) {
-        setTimeout(() => {
-          if (postsCache[postId]) openModal(postId, postsCache[postId]);
-          else db.collection("posts").doc(postId).get()
-            .then(doc => { if (doc.exists) openModal(doc.id, doc.data()); });
-        }, 1500);
-      }
-    });
-  </script>
+// ── Deep link on load ────────────────────────────────────────
+window.addEventListener("load", () => {
+  const postId = new URLSearchParams(location.search).get("post");
+  if (postId) {
+    setTimeout(() => {
+      if (postsCache[postId]) openModal(postId, postsCache[postId]);
+      else db.collection("posts").doc(postId).get()
+             .then(doc => { if (doc.exists) openModal(doc.id, doc.data()); });
+    }, 1500);
+  }
+});
+</script>
 </body>
-
 </html>

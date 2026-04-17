@@ -6,6 +6,7 @@
   <title>Directory — The Bangladesh Project</title>
   <meta name="description" content="Browse the A–Z directory of all entries in The Bangladesh Project." />
   <link rel="stylesheet" href="style.css" />
+  <script>(function(){ document.documentElement.setAttribute("data-theme", localStorage.getItem("tbp-theme")||"light"); })();</script>
 </head>
 <body>
 
@@ -13,7 +14,11 @@
 <nav class="nav">
   <div class="nav-inner">
     <span class="nav-logo">The Bangladesh Project</span>
-    <ul class="nav-links">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">🌙</button>
+      <button class="nav-hamburger" id="hamburger" aria-label="Menu" onclick="toggleNav()">☰</button>
+    </div>
+    <ul class="nav-links" id="nav-links">
       <li><a href="index.html">Feed</a></li>
       <li><a href="directory.html" class="active">Directory</a></li>
       <li><a href="submit.html">Submit</a></li>
@@ -85,6 +90,15 @@
 <script src="app.js"></script>
 
 <script>
+applyTheme();
+
+function toggleNav() { document.getElementById("nav-links").classList.toggle("open"); }
+document.addEventListener("click", e => {
+  const links = document.getElementById("nav-links");
+  const burger = document.getElementById("hamburger");
+  if (links.classList.contains("open") && !links.contains(e.target) && e.target !== burger)
+    links.classList.remove("open");
+});
 // ============================================================
 //  DIRECTORY PAGE LOGIC — mobile contacts-style A-Z
 // ============================================================

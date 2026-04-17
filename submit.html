@@ -6,6 +6,7 @@
   <title>Submit an Entry — The Bangladesh Project</title>
   <meta name="description" content="Submit a new entry to The Bangladesh Project public record." />
   <link rel="stylesheet" href="style.css" />
+  <script>(function(){ document.documentElement.setAttribute("data-theme", localStorage.getItem("tbp-theme")||"light"); })();</script>
 </head>
 <body>
 
@@ -13,7 +14,11 @@
 <nav class="nav">
   <div class="nav-inner">
     <span class="nav-logo">The Bangladesh Project</span>
-    <ul class="nav-links">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">🌙</button>
+      <button class="nav-hamburger" id="hamburger" aria-label="Menu" onclick="toggleNav()">☰</button>
+    </div>
+    <ul class="nav-links" id="nav-links">
       <li><a href="index.html">Feed</a></li>
       <li><a href="directory.html">Directory</a></li>
       <li><a href="submit.html" class="active">Submit</a></li>
@@ -41,30 +46,25 @@
 
       <!-- Name -->
       <div class="form-group">
-        <label for="name">Full Name</label>
-        <input
-          type="text"
-          id="name"
-          name="name"
-          class="form-control"
-          placeholder="e.g. John Doe"
-          required
-          autocomplete="off"
-        />
+        <label for="name">Full Name <span style="font-size:.75rem;color:#cc0000">* required</span></label>
+        <input type="text" id="name" name="name" class="form-control"
+          placeholder="e.g. John Doe" required autocomplete="off" />
       </div>
 
       <!-- Culprit Profile Link -->
       <div class="form-group">
         <label for="profile-link">Culprit Profile Link <span style="font-size:.75rem;color:#cc0000">* required</span></label>
-        <input
-          type="url"
-          id="profile-link"
-          name="profileLink"
-          class="form-control"
-          placeholder="https://facebook.com/username"
-          required
-        />
+        <input type="url" id="profile-link" name="profileLink" class="form-control"
+          placeholder="https://facebook.com/username" required />
         <p class="hint">Link to the culprit's social media profile or page.</p>
+      </div>
+
+      <!-- Category / Tag -->
+      <div class="form-group">
+        <label>Category <span style="font-size:.75rem;color:#cc0000">* required</span></label>
+        <div class="tag-chip-grid" id="tag-chip-grid"></div>
+        <input type="hidden" id="selected-tag" name="tag" />
+        <div id="tag-error">Please select a category.</div>
       </div>
 
       <!-- Culprit Image -->
@@ -82,14 +82,9 @@
 
       <!-- Comment -->
       <div class="form-group">
-        <label for="comment">Comment / Description</label>
-        <textarea
-          id="comment"
-          name="comment"
-          class="form-control"
-          placeholder="Describe what happened…"
-          required
-        ></textarea>
+        <label for="comment">Comment / Description <span style="font-size:.75rem;color:#cc0000">* required</span></label>
+        <textarea id="comment" name="comment" class="form-control"
+          placeholder="Describe what happened…" required></textarea>
       </div>
 
       <!-- Comment Image — MANDATORY -->
@@ -107,16 +102,9 @@
 
       <!-- Post Link — optional -->
       <div class="form-group">
-        <label for="post-link">
-          Post Link <span class="form-optional">(optional)</span>
-        </label>
-        <input
-          type="url"
-          id="post-link"
-          name="postLink"
-          class="form-control"
-          placeholder="https://facebook.com/post/…"
-        />
+        <label for="post-link">Post Link <span class="form-optional">(optional)</span></label>
+        <input type="url" id="post-link" name="postLink" class="form-control"
+          placeholder="https://facebook.com/post/…" />
         <p class="hint">Link to the original post, profile, or source.</p>
       </div>
 
@@ -144,10 +132,51 @@
 <script src="app.js"></script>
 
 <script>
-const form       = document.getElementById("submit-form");
-const submitBtn  = document.getElementById("submit-btn");
-const successMsg = document.getElementById("success-msg");
-const errorMsg   = document.getElementById("error-msg");
+applyTheme();
+function toggleNav() { document.getElementById("nav-links").classList.toggle("open"); }
+document.addEventListener("click", e => {
+  const links = document.getElementById("nav-links");
+  const burger = document.getElementById("hamburger");
+  if (links.classList.contains("open") && !links.contains(e.target) && e.target !== burger)
+    links.classList.remove("open");
+});
+
+// ── Build tag chips ──────────────────────────────────────────
+const chipGrid   = document.getElementById("tag-chip-grid");
+const tagInput   = document.getElementById("selected-tag");
+const tagError   = document.getElementById("tag-error");
+
+TAGS.forEach(t => {
+  const chip = document.createElement("button");
+  chip.type        = "button";
+  chip.className   = "tag-chip";
+  chip.dataset.tag = t.id;
+  chip.textContent = `${t.emoji} ${t.label}`;
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".tag-chip").forEach(c => c.classList.remove("selected"));
+    chip.classList.add("selected");
+    tagInput.value = t.id;
+    tagError.classList.remove("show");
+  });
+  chipGrid.appendChild(chip);
+});
+
+// ── Image previews ───────────────────────────────────────────
+const imgFile    = document.getElementById("img-file");
+const imgPreview = document.getElementById("img-preview");
+imgFile.addEventListener("change", async () => {
+  if (!imgFile.files[0]) return;
+  imgPreview.src = await fileToBase64(imgFile.files[0]);
+  imgPreview.style.display = "block";
+});
+
+const commentImgFile    = document.getElementById("comment-img-file");
+const commentImgPreview = document.getElementById("comment-img-preview");
+commentImgFile.addEventListener("change", async () => {
+  if (!commentImgFile.files[0]) return;
+  commentImgPreview.src = await fileToBase64(commentImgFile.files[0]);
+  commentImgPreview.style.display = "block";
+});
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -158,27 +187,14 @@ function fileToBase64(file) {
   });
 }
 
-/* ── Profile image preview ───────────────────────────────── */
-const imgFile    = document.getElementById("img-file");
-const imgPreview = document.getElementById("img-preview");
+// ── Form Submit ──────────────────────────────────────────────
+const form       = document.getElementById("submit-form");
+const submitBtn  = document.getElementById("submit-btn");
+const successMsg = document.getElementById("success-msg");
+const errorMsg   = document.getElementById("error-msg");
 
-imgFile.addEventListener("change", async () => {
-  if (!imgFile.files[0]) return;
-  imgPreview.src = await fileToBase64(imgFile.files[0]);
-  imgPreview.style.display = "block";
-});
+function showErr(msg) { errorMsg.textContent = msg; errorMsg.classList.add("show"); }
 
-/* ── Comment image preview ──────────────────────────────── */
-const commentImgFile    = document.getElementById("comment-img-file");
-const commentImgPreview = document.getElementById("comment-img-preview");
-
-commentImgFile.addEventListener("change", async () => {
-  if (!commentImgFile.files[0]) return;
-  commentImgPreview.src = await fileToBase64(commentImgFile.files[0]);
-  commentImgPreview.style.display = "block";
-});
-
-/* ── Form Submit ─────────────────────────────────────────── */
 form.addEventListener("submit", async e => {
   e.preventDefault();
   successMsg.classList.remove("show");
@@ -188,44 +204,41 @@ form.addEventListener("submit", async e => {
   const comment     = document.getElementById("comment").value.trim();
   const postLink    = document.getElementById("post-link").value.trim();
   const profileLink = document.getElementById("profile-link").value.trim();
+  const tag         = tagInput.value;
 
   if (!name)        { showErr("Please enter a name."); document.getElementById("name").focus(); return; }
-  if (!profileLink) { showErr("Please enter the culprit's profile link. This is required."); document.getElementById("profile-link").focus(); return; }
-  if (!comment)     { showErr("Please enter a comment."); document.getElementById("comment").focus(); return; }
+  if (!profileLink) { showErr("Please enter the culprit's profile link."); document.getElementById("profile-link").focus(); return; }
+  if (!tag)         { tagError.classList.add("show"); tagError.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+  if (!comment)     { showErr("Please enter a comment / description."); document.getElementById("comment").focus(); return; }
 
-  // Resolve images (file upload only)
-  let image = imgFile.files[0] ? await fileToBase64(imgFile.files[0]) : "";
+  // Images (file upload only)
+  let image        = imgFile.files[0]        ? await fileToBase64(imgFile.files[0])        : "";
   let commentImage = commentImgFile.files[0] ? await fileToBase64(commentImgFile.files[0]) : "";
 
-  // Comment image is mandatory
   if (!commentImage) {
     showErr("Please upload a comment image. This is required.");
-    document.getElementById("comment-img-file").focus();
     return;
   }
 
-  submitBtn.disabled = true;
+  submitBtn.disabled   = true;
   submitBtn.textContent = "Submitting…";
 
   try {
-    await addPost({ name, image, comment, commentImage, postLink, profileLink });
+    await addPost({ name, image, comment, commentImage, postLink, profileLink, tag });
     form.reset();
     imgPreview.style.display = "none";
     commentImgPreview.style.display = "none";
+    document.querySelectorAll(".tag-chip").forEach(c => c.classList.remove("selected"));
+    tagInput.value = "";
     successMsg.classList.add("show");
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) {
     showErr("Submission failed: " + err.message);
   } finally {
-    submitBtn.disabled = false;
+    submitBtn.disabled   = false;
     submitBtn.textContent = "Submit Entry";
   }
 });
-
-function showErr(msg) {
-  errorMsg.textContent = msg;
-  errorMsg.classList.add("show");
-}
 </script>
 </body>
 </html>

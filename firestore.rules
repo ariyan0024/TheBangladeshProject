@@ -1,23 +1,26 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /posts/{postId} {
 
-      // Anyone can read (public feed + directory)
+    match /posts/{postId} {
+      // Anyone can read posts
       allow read: if true;
 
-      // Anyone can create (public submissions)
-      // Enforce required fields and default status
-      allow create: if request.resource.data.keys().hasAll(['name','comment','status','timestamp'])
-                    && request.resource.data.status == 'pending'
-                    && request.resource.data.name is string
-                    && request.resource.data.comment is string;
+      // Anyone can create a pending post
+      allow create: if true;
 
-      // Only authenticated admins can update or delete
-      // Exception: anyone can increment the 'views' counter
-      allow update: if request.auth != null
-                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']));
-      allow delete: if request.auth != null;
+      // All updates (approve, report, flag, edit) and deletes require Google/email auth
+      allow update, delete: if request.auth != null;
+
+      // Comments sub-collection
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if request.auth != null
+          && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow delete: if request.auth != null;
+      }
     }
   }
 }

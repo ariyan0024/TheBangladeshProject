@@ -1,11 +1,41 @@
 // ============================================================
-//  THE BANGLADESH PROJECT — app.js
-//  Firebase v9 Compat SDK (loaded via CDN in HTML files)
+//  THE BANGLADESH PROJECT — app.js  (v3)
 // ============================================================
 
-// ── Firebase Config ─────────────────────────────────────────
-// ⚠ Replace with YOUR Firebase project credentials:
-//   Firebase Console → Project Settings → Your apps → Web
+// ── Tags ─────────────────────────────────────────────────────
+const TAGS = [
+  { id: "harassment",     label: "Harassment",            emoji: "😡" },
+  { id: "scam",           label: "Scam / Fraud",          emoji: "💰" },
+  { id: "misinformation", label: "Misinformation",        emoji: "❌" },
+  { id: "inappropriate",  label: "Inappropriate Content", emoji: "⚠️" },
+  { id: "threats",        label: "Threats",               emoji: "🔴" },
+  { id: "privacy",        label: "Privacy Violation",     emoji: "🔒" },
+  { id: "other",          label: "Other",                 emoji: "📋" },
+];
+
+// ── Dark mode (runs immediately to prevent flash) ─────────────
+function applyTheme() {
+  const saved = localStorage.getItem("tbp-theme") || "light";
+  document.documentElement.setAttribute("data-theme", saved);
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = saved === "dark" ? "☀️" : "🌙";
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "light";
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("tbp-theme", next);
+  document.querySelectorAll(".theme-toggle-btn").forEach(btn => {
+    btn.textContent = next === "dark" ? "☀️" : "🌙";
+  });
+}
+// Apply immediately
+(function() {
+  const saved = localStorage.getItem("tbp-theme") || "light";
+  document.documentElement.setAttribute("data-theme", saved);
+})();
+
+// ── Firebase Config ──────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyAw397cFFvs2nMTiz1hj1pbAGxd83xnfco",
   authDomain: "thebangladeshproject0.firebaseapp.com",
@@ -15,74 +45,73 @@ const firebaseConfig = {
   appId: "1:366972587357:web:d330a3637b26808ad62cb4"
 };
 
-// ── Init ────────────────────────────────────────────────────
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db   = firebase.firestore();
 const auth = firebase.auth();
-
-// Collection reference
 const postsCol = db.collection("posts");
 
 // ── Firestore Helpers ────────────────────────────────────────
 
 /** Add a new post (pending by default) */
-async function addPost({ name, image, comment, commentImage = "", postLink = "", profileLink = "" }) {
+async function addPost({ name, image, comment, commentImage = "", postLink = "", profileLink = "", tag = "" }) {
   return postsCol.add({
-    name: name.trim(),
-    nameLower: name.trim().toLowerCase(),
-    image: image.trim(),
-    comment: comment.trim(),
+    name:         name.trim(),
+    nameLower:    name.trim().toLowerCase(),
+    image:        image.trim(),
+    comment:      comment.trim(),
     commentImage: commentImage.trim(),
-    postLink: postLink.trim(),
-    profileLink: profileLink.trim(),
-    status: "pending",
-    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    reports: 0
+    postLink:     postLink.trim(),
+    profileLink:  profileLink.trim(),
+    tag:          tag,
+    status:       "pending",
+    timestamp:    firebase.firestore.FieldValue.serverTimestamp(),
+    reports:      0,
+    commentCount: 0
   });
 }
 
-/** Approve a post */
 async function approvePost(id) {
   return postsCol.doc(id).update({ status: "approved" });
 }
 
-/** Reject / delete a post */
 async function deletePost(id) {
   return postsCol.doc(id).delete();
 }
 
-/** Update a post's comment text */
 async function updatePost(id, fields) {
   return postsCol.doc(id).update(fields);
 }
 
-/** Increment report counter */
+/** Increments report count; flags post if ≥ 10 reports */
 async function reportPost(id) {
-  return postsCol.doc(id).update({
-    reports: firebase.firestore.FieldValue.increment(1)
+  return db.runTransaction(async t => {
+    const ref  = postsCol.doc(id);
+    const snap = await t.get(ref);
+    const data = snap.data();
+    const newReports = (data.reports || 0) + 1;
+    const updates = { reports: newReports };
+    if (newReports >= 10 && data.status === "approved") {
+      updates.status = "flagged";
+    }
+    t.update(ref, updates);
   });
 }
 
-/** Increment view counter (public — allowed by Firestore rules) */
-async function incrementViews(id) {
-  return postsCol.doc(id).update({
-    views: firebase.firestore.FieldValue.increment(1)
-  });
-}
-
+// ── Sort helper ───────────────────────────────────────────────
 /** Sort a Firestore snapshot newest-first and return a compatible object */
 function sortedSnap(snap) {
   const docs = [];
   snap.forEach(doc => docs.push(doc));
   docs.sort((a, b) => (b.data().timestamp?.seconds || 0) - (a.data().timestamp?.seconds || 0));
   return {
-    size: docs.length,
-    empty: docs.length === 0,
+    size:    docs.length,
+    empty:   docs.length === 0,
     forEach: cb => docs.forEach(cb)
   };
 }
 
-// ── Realtime Feed (approved, newest first — sorted client-side) ───────────────
+// ── Realtime Subscriptions ────────────────────────────────────
+
 function subscribeApprovedFeed(callback) {
   return postsCol
     .where("status", "==", "approved")
@@ -92,7 +121,16 @@ function subscribeApprovedFeed(callback) {
     );
 }
 
-// ── A–Z Directory ─────────────────────────────────────────────
+function subscribeApprovedByTag(tag, callback) {
+  return postsCol
+    .where("status", "==", "approved")
+    .where("tag", "==", tag)
+    .onSnapshot(
+      snap => callback(sortedSnap(snap)),
+      err  => console.error("Tag feed error:", err)
+    );
+}
+
 async function getNamesByLetter(letter) {
   const lo = letter.toLowerCase();
   const hi = lo + "\uf8ff";
@@ -101,19 +139,16 @@ async function getNamesByLetter(letter) {
     .where("nameLower", ">=", lo)
     .where("nameLower", "<", hi)
     .get();
-  // Return unique names
   const names = new Set();
   snap.forEach(doc => names.add(doc.data().name));
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
 function subscribePostsByName(name, callback) {
-  // No orderBy here to avoid needing an extra composite index — sort client-side
   return postsCol
     .where("status", "==", "approved")
     .where("name", "==", name)
     .onSnapshot(snap => {
-      // Sort newest first client-side
       const sorted = [];
       snap.forEach(doc => sorted.push({ id: doc.id, data: doc.data() }));
       sorted.sort((a, b) => (b.data.timestamp?.seconds || 0) - (a.data.timestamp?.seconds || 0));
@@ -121,7 +156,7 @@ function subscribePostsByName(name, callback) {
     });
 }
 
-// ── Admin Queries (no orderBy → no extra index needed, sort client-side) ─────
+// ── Admin Subscriptions ───────────────────────────────────────
 function subscribePendingPosts(callback) {
   return postsCol
     .where("status", "==", "pending")
@@ -134,29 +169,60 @@ function subscribeApprovedAdmin(callback) {
     .onSnapshot(snap => callback(sortedSnap(snap)));
 }
 
+function subscribeFlaggedPosts(callback) {
+  return postsCol
+    .where("status", "==", "flagged")
+    .onSnapshot(
+      snap => callback(sortedSnap(snap)),
+      err  => console.error("Flagged error:", err)
+    );
+}
 
 // ── Auth ──────────────────────────────────────────────────────
-function signIn(email, password) {
-  return auth.signInWithEmailAndPassword(email, password);
+function signIn(email, password) { return auth.signInWithEmailAndPassword(email, password); }
+function signOut()                { return auth.signOut(); }
+function onAuthChange(cb)         { return auth.onAuthStateChanged(cb); }
+
+/** Google sign-in for public users (commenting) */
+function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  return auth.signInWithPopup(provider);
 }
-function signOut() { return auth.signOut(); }
-function onAuthChange(cb) { return auth.onAuthStateChanged(cb); }
+
+// ── Comments ──────────────────────────────────────────────────
+function subscribeComments(postId, callback) {
+  return db.collection("posts").doc(postId).collection("comments")
+    .orderBy("timestamp", "asc")
+    .onSnapshot(callback, err => console.error("Comments error:", err));
+}
+
+async function addComment(postId, text) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not signed in");
+  return db.collection("posts").doc(postId)
+    .collection("comments")
+    .add({
+      text:        text.trim(),
+      authorName:  user.displayName || "Anonymous",
+      authorPhoto: user.photoURL    || "",
+      authorUid:   user.uid,
+      timestamp:   firebase.firestore.FieldValue.serverTimestamp()
+    });
+}
 
 // ── Utilities ─────────────────────────────────────────────────
 
-/** Format Firestore timestamp to readable string */
 function formatTime(ts) {
   if (!ts) return "just now";
   const date = ts.toDate ? ts.toDate() : new Date(ts);
-  const now = new Date();
+  const now  = new Date();
   const diff = Math.floor((now - date) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 60)    return "just now";
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** Show a transient toast notification */
 function showToast(msg, duration = 2800) {
   let container = document.querySelector(".toast-container");
   if (!container) {
@@ -165,13 +231,12 @@ function showToast(msg, duration = 2800) {
     document.body.appendChild(container);
   }
   const t = document.createElement("div");
-  t.className = "toast";
+  t.className  = "toast";
   t.textContent = msg;
   container.appendChild(t);
   setTimeout(() => t.remove(), duration);
 }
 
-/** Copy text to clipboard */
 function copyToClipboard(text) {
   if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(() => showToast("Link copied!"));
@@ -186,12 +251,8 @@ function copyToClipboard(text) {
   }
 }
 
-/** Initials avatar fallback */
-function getInitial(name) {
-  return (name || "?").trim()[0].toUpperCase();
-}
+function getInitial(name) { return (name || "?").trim()[0].toUpperCase(); }
 
-/** Escape HTML to prevent XSS */
 function esc(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -200,27 +261,33 @@ function esc(str) {
     .replace(/"/g, "&quot;");
 }
 
-/** Build a single post card element */
+function getTagInfo(tagId) {
+  return TAGS.find(t => t.id === tagId) || { id: tagId, label: tagId, emoji: "📌" };
+}
+
+/** Build a feed post card element */
 function buildCard(id, data) {
   const card = document.createElement("article");
-  card.className = "card";
+  card.className  = "card";
   card.dataset.id = id;
 
   const avatarHtml = data.image
     ? `<img class="card-avatar" src="${esc(data.image)}" alt="${esc(data.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
     : "";
-  const placeholderHtml = `<div class="card-avatar-placeholder" style="${data.image ? "display:none" : ""}"> ${esc(getInitial(data.name))}</div>`;
+  const placeholderHtml = `<div class="card-avatar-placeholder" style="${data.image ? "display:none" : ""}">${esc(getInitial(data.name))}</div>`;
+
+  const tagInfo = data.tag ? getTagInfo(data.tag) : null;
+  const tagHtml = tagInfo
+    ? `<span class="tag-badge tag-${esc(tagInfo.id)}">${tagInfo.emoji} ${esc(tagInfo.label)}</span>`
+    : "";
 
   const commentImgHtml = data.commentImage
-    ? `<img class="card-image" src="${esc(data.commentImage)}" alt="comment image" loading="lazy" onerror="this.remove()">`
+    ? `<img class="card-image" src="${esc(data.commentImage)}" alt="evidence" loading="lazy" onerror="this.remove()">`
     : "";
 
   const postLinkHtml = data.postLink
     ? `<a class="card-post-link" href="${esc(data.postLink)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">🔗 ${esc(data.postLink)}</a>`
     : "";
-
-  const views = data.views || 0;
-  const viewsHtml = `<span class="card-views" title="${views} views">👁 ${views >= 1000 ? (views/1000).toFixed(1) + 'k' : views}</span>`;
 
   card.innerHTML = `
     <div class="card-header">
@@ -230,7 +297,7 @@ function buildCard(id, data) {
         <div class="card-name">${esc(data.name)}</div>
         <div class="card-time">${formatTime(data.timestamp)}</div>
       </div>
-      ${viewsHtml}
+      ${tagHtml}
     </div>
     <div class="card-comment">${esc(data.comment)}</div>
     ${commentImgHtml}

@@ -6,6 +6,7 @@
   <title>Admin — The Bangladesh Project</title>
   <meta name="robots" content="noindex,nofollow" />
   <link rel="stylesheet" href="style.css" />
+  <script>(function(){ document.documentElement.setAttribute("data-theme", localStorage.getItem("tbp-theme")||"light"); })();</script>
 </head>
 <body>
 
@@ -41,19 +42,26 @@
   <aside class="admin-sidebar">
     <div class="admin-sidebar-logo">Admin Panel</div>
     <ul class="admin-nav">
-      <li class="admin-nav-item">
+      <li>
         <button class="admin-nav-btn active" data-tab="pending">
           Pending
           <span class="admin-nav-badge" id="pending-badge" style="display:none">0</span>
         </button>
       </li>
-      <li class="admin-nav-item">
+      <li>
         <button class="admin-nav-btn" data-tab="entries">Live Entries</button>
       </li>
+      <li>
+        <button class="admin-nav-btn" data-tab="flagged">
+          Flagged
+          <span class="admin-nav-badge" id="flagged-badge" style="display:none;background:#b45309">0</span>
+        </button>
+      </li>
     </ul>
-    <div style="padding:16px 20px;position:absolute;bottom:0;width:100%;border-top:1px solid var(--border)">
-      <div id="admin-email-label" style="font-size:.72rem;color:var(--subtle);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <div style="padding:14px 16px;border-top:1px solid var(--border);margin-top:auto">
+      <div id="admin-email-label" style="font-size:.7rem;color:var(--subtle);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" style="flex-shrink:0">🌙</button>
         <a href="index.html" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;text-align:center">← Site</a>
         <button class="btn btn-outline btn-sm" id="logout-btn" style="flex:1;justify-content:center">Sign Out</button>
       </div>
@@ -63,7 +71,7 @@
   <!-- Main -->
   <main class="admin-main">
 
-    <!-- ── Pending Tab ──────────────────────────────────── -->
+    <!-- ── Pending Tab ────────────────────────────────────── -->
     <div id="tab-pending">
       <div class="admin-header">
         <h1>Pending Submissions</h1>
@@ -74,7 +82,7 @@
       <div id="pending-list"><div class="loader"><div class="spinner"></div></div></div>
     </div>
 
-    <!-- ── Live Entries Tab ─────────────────────────────── -->
+    <!-- ── Live Entries Tab ───────────────────────────────── -->
     <div id="tab-entries" style="display:none">
       <div class="admin-header">
         <h1>Live Entries</h1>
@@ -84,6 +92,18 @@
         <input type="text" id="entries-search" class="form-control" placeholder="Search by name…" />
       </div>
       <div id="entries-list"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- ── Flagged Tab ────────────────────────────────────── -->
+    <div id="tab-flagged" style="display:none">
+      <div class="admin-header">
+        <h1>Flagged Posts</h1>
+        <span style="font-size:.82rem;color:#b45309">Posts with ≥10 reports — review &amp; decide</span>
+      </div>
+      <div class="admin-search" style="margin-bottom:16px">
+        <input type="text" id="flagged-search" class="form-control" placeholder="Filter by name…" />
+      </div>
+      <div id="flagged-list"><div class="loader"><div class="spinner"></div></div></div>
     </div>
 
   </main>
@@ -136,26 +156,26 @@
 <script src="app.js"></script>
 
 <script>
-// ============================================================
-//  ADMIN PAGE LOGIC
-// ============================================================
+applyTheme();
 
-let unsubPending  = null;
-let unsubEntries  = null;
+let unsubPending = null;
+let unsubEntries = null;
+let unsubFlagged = null;
 
 /* ── Auth ──────────────────────────────────────────────────── */
 const loginError = document.getElementById("login-error");
 const loginBtn   = document.getElementById("login-btn");
 
 onAuthChange(user => {
-  document.getElementById("auth-screen").style.display  = user ? "none" : "flex";
-  document.getElementById("admin-panel").style.display  = user ? "flex" : "none";
+  document.getElementById("auth-screen").style.display = user ? "none" : "flex";
+  document.getElementById("admin-panel").style.display = user ? "flex" : "none";
   if (user) {
     document.getElementById("admin-email-label").textContent = user.email;
     startListeners();
   } else {
-    if (unsubPending)  { unsubPending();  unsubPending  = null; }
-    if (unsubEntries)  { unsubEntries();  unsubEntries  = null; }
+    if (unsubPending) { unsubPending(); unsubPending = null; }
+    if (unsubEntries) { unsubEntries(); unsubEntries = null; }
+    if (unsubFlagged) { unsubFlagged(); unsubFlagged = null; }
   }
 });
 
@@ -179,23 +199,28 @@ document.querySelectorAll(".admin-nav-btn[data-tab]").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".admin-nav-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
-    document.getElementById("tab-pending").style.display = btn.dataset.tab === "pending"  ? "" : "none";
-    document.getElementById("tab-entries").style.display = btn.dataset.tab === "entries"  ? "" : "none";
+    document.getElementById("tab-pending").style.display = btn.dataset.tab === "pending" ? "" : "none";
+    document.getElementById("tab-entries").style.display = btn.dataset.tab === "entries" ? "" : "none";
+    document.getElementById("tab-flagged").style.display = btn.dataset.tab === "flagged" ? "" : "none";
   });
 });
 
 /* ── Listeners ─────────────────────────────────────────────── */
 function startListeners() {
-  // Pending
   unsubPending = subscribePendingPosts(snap => {
     const badge = document.getElementById("pending-badge");
-    badge.textContent = snap.size;
+    badge.textContent  = snap.size;
     badge.style.display = snap.size ? "" : "none";
     renderList("pending-list", snap, "pending");
   });
-  // Live entries (approved)
   unsubEntries = subscribeApprovedAdmin(snap => {
     renderList("entries-list", snap, "entries");
+  });
+  unsubFlagged = subscribeFlaggedPosts(snap => {
+    const badge = document.getElementById("flagged-badge");
+    badge.textContent  = snap.size;
+    badge.style.display = snap.size ? "" : "none";
+    renderList("flagged-list", snap, "flagged");
   });
 }
 
@@ -204,19 +229,20 @@ function renderList(containerId, snapshot, type) {
   const container = document.getElementById(containerId);
   container.innerHTML = "";
   if (snapshot.empty) {
-    container.innerHTML = `<p style="color:var(--subtle);padding:32px;text-align:center;font-size:.88rem">No ${type === "pending" ? "pending submissions" : "live entries"} yet.</p>`;
+    const labels = { pending: "pending submissions", entries: "live entries", flagged: "flagged posts" };
+    container.innerHTML = `<p style="color:var(--subtle);padding:32px;text-align:center;font-size:.88rem">No ${labels[type] || type} yet.</p>`;
     return;
   }
   snapshot.forEach(doc => container.appendChild(buildAdminCard(doc.id, doc.data(), type)));
-  // Re-apply search
-  const q = document.getElementById(type === "pending" ? "pending-search" : "entries-search").value.toLowerCase().trim();
+  const searchId = { pending: "pending-search", entries: "entries-search", flagged: "flagged-search" }[type];
+  const q = searchId ? document.getElementById(searchId).value.toLowerCase().trim() : "";
   if (q) filterList(containerId, q);
 }
 
 /* ── Admin card ─────────────────────────────────────────────── */
 function buildAdminCard(id, data, type) {
   const card = document.createElement("div");
-  card.className = "admin-card";
+  card.className    = "admin-card";
   card.dataset.name = (data.name || "").toLowerCase();
 
   const avatarHtml = data.image
@@ -227,26 +253,44 @@ function buildAdminCard(id, data, type) {
     ? `<img class="admin-card-image" src="${esc(data.commentImage)}" alt="" onerror="this.remove()" />`
     : "";
 
+  const tagInfo = data.tag ? getTagInfo(data.tag) : null;
+  const tagHtml = tagInfo
+    ? `<span class="tag-badge tag-${esc(tagInfo.id)}" style="margin-bottom:6px">${tagInfo.emoji} ${esc(tagInfo.label)}</span>`
+    : "";
+
   const profileLinkHtml = data.profileLink
     ? `<a href="${esc(data.profileLink)}" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:4px;display:inline-block">👤 ${esc(data.profileLink)}</a>`
     : "";
 
   const postLinkHtml = data.postLink
-    ? `<a href="${esc(data.postLink)}" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:6px;display:inline-block">🔗 ${esc(data.postLink)}</a>`
+    ? `<a href="${esc(data.postLink)}" target="_blank" rel="noopener noreferrer" class="card-post-link" style="margin-top:4px;display:inline-block">🔗 ${esc(data.postLink)}</a>`
     : "";
 
-  const isPending = type === "pending";
-  const actionsHtml = isPending
-    ? `<button class="btn btn-primary btn-sm" data-action="approve" data-id="${id}">✓ Approve</button>
-       <button class="btn btn-danger  btn-sm" data-action="reject"  data-id="${id}">✕ Reject</button>`
-    : `<button class="btn btn-outline btn-sm" data-action="edit"   data-id="${id}">✎ Edit</button>
-       <button class="btn btn-danger  btn-sm" data-action="delete" data-id="${id}">🗑 Delete</button>`;
+  let actionsHtml;
+  if (type === "pending") {
+    actionsHtml = `
+      <button class="btn btn-primary btn-sm" data-action="approve" data-id="${id}">✓ Approve</button>
+      <button class="btn btn-danger  btn-sm" data-action="reject"  data-id="${id}">✕ Reject</button>`;
+  } else if (type === "flagged") {
+    actionsHtml = `
+      <button class="btn btn-primary btn-sm" data-action="restore" data-id="${id}">✓ Restore</button>
+      <button class="btn btn-danger  btn-sm" data-action="delete"  data-id="${id}">🗑 Delete</button>`;
+  } else {
+    actionsHtml = `
+      <button class="btn btn-outline btn-sm" data-action="edit"   data-id="${id}">✎ Edit</button>
+      <button class="btn btn-danger  btn-sm" data-action="delete" data-id="${id}">🗑 Delete</button>`;
+  }
+
+  const reportsHtml = data.reports
+    ? `<span style="font-size:.72rem;color:#b45309;margin-left:6px">⚑ ${data.reports} report${data.reports > 1 ? "s" : ""}</span>`
+    : "";
 
   card.innerHTML = `
     ${avatarHtml}
     <div class="admin-card-body">
       <div class="admin-card-name">${esc(data.name)}</div>
-      <div class="admin-card-meta">${formatTime(data.timestamp)}${data.reports ? ` · ⚑ ${data.reports} report(s)` : ""}</div>
+      <div class="admin-card-meta">${formatTime(data.timestamp)}${reportsHtml}</div>
+      ${tagHtml}
       ${profileLinkHtml}
       <div class="admin-card-comment">${esc(data.comment)}</div>
       ${commentImgHtml}
@@ -266,11 +310,20 @@ async function handleAction(action, id, data) {
   if (action === "approve") {
     try { await approvePost(id); showToast("✓ Post approved — now live."); }
     catch (e) { showToast("Error: " + e.message); }
+
+  } else if (action === "restore") {
+    // Re-approve a flagged post and reset reports
+    try {
+      await updatePost(id, { status: "approved", reports: 0 });
+      showToast("✓ Post restored to live feed.");
+    } catch (e) { showToast("Error: " + e.message); }
+
   } else if (action === "reject" || action === "delete") {
-    const label = action === "delete" ? "delete this live entry" : "reject this submission";
+    const label = action === "delete" ? "delete this entry" : "reject this submission";
     if (!confirm(`Are you sure you want to ${label}? This cannot be undone.`)) return;
     try { await deletePost(id); showToast("Post deleted."); }
     catch (e) { showToast("Error: " + e.message); }
+
   } else if (action === "edit") {
     openEditModal(id, data);
   }
@@ -284,6 +337,7 @@ function filterList(containerId, query) {
 }
 document.getElementById("pending-search").addEventListener("input", e => filterList("pending-list", e.target.value.toLowerCase().trim()));
 document.getElementById("entries-search").addEventListener("input", e => filterList("entries-list", e.target.value.toLowerCase().trim()));
+document.getElementById("flagged-search").addEventListener("input", e => filterList("flagged-list", e.target.value.toLowerCase().trim()));
 
 /* ── Edit Modal ──────────────────────────────────────────────── */
 const editOverlay = document.getElementById("edit-overlay");
@@ -291,13 +345,13 @@ const editClose   = document.getElementById("edit-close");
 const editForm    = document.getElementById("edit-form");
 
 function openEditModal(id, data) {
-  document.getElementById("edit-id").value             = id;
-  document.getElementById("edit-name").value           = data.name         || "";
-  document.getElementById("edit-comment").value        = data.comment      || "";
-  document.getElementById("edit-image").value          = data.image        || "";
-  document.getElementById("edit-comment-image").value  = data.commentImage || "";
-  document.getElementById("edit-post-link").value      = data.postLink     || "";
-  document.getElementById("edit-profile-link").value   = data.profileLink  || "";
+  document.getElementById("edit-id").value            = id;
+  document.getElementById("edit-name").value          = data.name         || "";
+  document.getElementById("edit-comment").value       = data.comment      || "";
+  document.getElementById("edit-image").value         = data.image        || "";
+  document.getElementById("edit-comment-image").value = data.commentImage || "";
+  document.getElementById("edit-post-link").value     = data.postLink     || "";
+  document.getElementById("edit-profile-link").value  = data.profileLink  || "";
   editOverlay.classList.add("open");
   document.body.style.overflow = "hidden";
 }
@@ -305,7 +359,6 @@ function openEditModal(id, data) {
 editClose.addEventListener("click", closeEditModal);
 editOverlay.addEventListener("click", e => { if (e.target === editOverlay) closeEditModal(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeEditModal(); });
-
 function closeEditModal() { editOverlay.classList.remove("open"); document.body.style.overflow = ""; }
 
 editForm.addEventListener("submit", async e => {
